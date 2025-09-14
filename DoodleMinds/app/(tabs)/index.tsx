@@ -2,8 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { StyleSheet, View, Text, Button, Pressable, Modal } from 'react-native';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import Svg, { Path } from 'react-native-svg';
-
-// We no longer need 'svg-path-properties', so the import is removed.
 import { storyData, InteractionPoint } from '../../data/story1';
 
 const DrawingInterface = ({
@@ -16,19 +14,12 @@ const DrawingInterface = ({
   const [userPaths, setUserPaths] = useState<string[]>([]);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const currentPath = useRef<string>('');
-  
-  // REMOVED: The logic for measuring SVG length is gone, simplifying the component.
 
-  // NEW: A much simpler function to check for completion by counting drawn points.
   const checkTraceCompletion = (currentPaths: string[]) => {
-    // We combine all path strings into one big string.
     const allPaths = currentPaths.join('');
-    // We count how many "L" (line) commands there are, which corresponds to points drawn.
     const pointsDrawn = (allPaths.match(/ L/g) || []).length;
-    
-    // We'll consider it "complete" if the user has drawn a certain number of points.
-    const COMPLETION_THRESHOLD_POINTS = 80; // <-- You can adjust this!
-    
+
+    const COMPLETION_THRESHOLD_POINTS = 80;
     if (pointsDrawn >= COMPLETION_THRESHOLD_POINTS) {
       setShowSuccessPopup(true);
       setTimeout(() => {
@@ -49,7 +40,7 @@ const DrawingInterface = ({
     currentPath.current += newPoint;
     setUserPaths(prev => [...prev.slice(0, -1), currentPath.current]);
   };
-  
+
   const handleDrawingEnd = () => {
     checkTraceCompletion(userPaths);
   };
@@ -66,7 +57,6 @@ const DrawingInterface = ({
       >
         <Svg height="100%" width="100%" viewBox="0 0 300 300">
           <Path
-            // No more ref needed here
             d={interaction.outlineSvgPath}
             stroke="#a9a9a9"
             strokeWidth={3}
@@ -83,7 +73,7 @@ const DrawingInterface = ({
         <Button title="Continue the Story" onPress={onContinueStory} />
       </View>
 
-      <Modal visible={showSuccessPopup} transparent={true} animationType="fade">
+      <Modal visible={showSuccessPopup} transparent animationType="fade">
         <View style={styles.popupContainer}>
           <View style={styles.popup}>
             <Text style={styles.popupText}>Well done! 🎉</Text>
@@ -94,100 +84,124 @@ const DrawingInterface = ({
   );
 };
 
-
-// --- HomeScreen Component (No changes needed) ---
 export default function HomeScreen() {
-    const [appState, setAppState] = useState<'video' | 'drawing'>('video');
-    const [isPlaying, setIsPlaying] = useState(true);
-    const [controlsVisible, setControlsVisible] = useState(false);
-    const [currentInteraction, setCurrentInteraction] = useState<InteractionPoint | null>(null);
-    const [completedTimestamps, setCompletedTimestamps] = useState<number[]>([]);
-    const videoRef = useRef<Video>(null);
-    const hideControlsTimer = useRef<NodeJS.Timeout | null>(null);
-  
-    const handlePlaybackStatusUpdate = (status: AVPlaybackStatus) => {
-      if (!status.isLoaded) return;
-  
-      const nextInteraction = storyData.interactionPoints.find(
-        point => status.positionMillis >= point.timestamp && !completedTimestamps.includes(point.timestamp)
-      );
-  
-      if (nextInteraction) {
-        videoRef.current?.pauseAsync();
-        setIsPlaying(false);
-        setCurrentInteraction(nextInteraction);
-        setCompletedTimestamps(prev => [...prev, nextInteraction.timestamp]);
-        setAppState('drawing');
-      }
-    };
-  
-    const handleContinueStory = () => {
-      setAppState('video');
-      setCurrentInteraction(null);
-      videoRef.current?.playAsync();
-      setIsPlaying(true);
-    };
-  
-    const showControls = () => {
-      if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
-      setControlsVisible(true);
-      hideControlsTimer.current = setTimeout(() => { setControlsVisible(false); }, 3000);
-    };
-  
-    const togglePlayPause = () => {
-      showControls();
-      setIsPlaying(prev => {
-        const isNowPlaying = !prev;
-        if (isNowPlaying) videoRef.current?.playAsync();
-        else videoRef.current?.pauseAsync();
-        return isNowPlaying;
-      });
-    };
-  
-    useEffect(() => {
-      return () => {
-        if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
-        videoRef.current?.unloadAsync();
-      };
-    }, []);
-  
-    return (
-      <View style={styles.container}>
-        <Pressable style={styles.videoContainer} onPress={showControls}>
-          <Video
-            ref={videoRef}
-            style={styles.video}
-            source={storyData.video}
-            resizeMode={ResizeMode.CONTAIN}
-            shouldPlay={isPlaying}
-            onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
-          />
-        </Pressable>
-  
-        {controlsVisible && appState === 'video' && (
-          <Pressable style={styles.controlsOverlay} onPress={togglePlayPause}>
-            <Text style={styles.controlButtonText}>{isPlaying ? '❚❚' : '▶'}</Text>
-          </Pressable>
-        )}
-  
-        {appState === 'drawing' && currentInteraction && (
-          <View style={styles.drawingOverlay}>
-            <DrawingInterface interaction={currentInteraction} onContinueStory={handleContinueStory} />
-          </View>
-        )}
-      </View>
+  const [appState, setAppState] = useState<'video' | 'drawing'>('video');
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [controlsVisible, setControlsVisible] = useState(false);
+  const [currentInteraction, setCurrentInteraction] = useState<InteractionPoint | null>(null);
+  const [completedTimestamps, setCompletedTimestamps] = useState<number[]>([]);
+  const videoRef = useRef<Video>(null);
+  const hideControlsTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const handlePlaybackStatusUpdate = (status: AVPlaybackStatus) => {
+    if (!status.isLoaded) return;
+
+    const nextInteraction = storyData.interactionPoints.find(
+      point => status.positionMillis >= point.timestamp && !completedTimestamps.includes(point.timestamp)
     );
+
+    if (nextInteraction) {
+      videoRef.current?.pauseAsync();
+      setIsPlaying(false);
+      setCurrentInteraction(nextInteraction);
+      setCompletedTimestamps(prev => [...prev, nextInteraction.timestamp]);
+      setAppState('drawing');
+    }
+  };
+
+  const handleContinueStory = () => {
+    setAppState('video');
+    setCurrentInteraction(null);
+    videoRef.current?.playAsync();
+    setIsPlaying(true);
+  };
+
+  const showControls = () => {
+    if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
+    setControlsVisible(true);
+    hideControlsTimer.current = setTimeout(() => {
+      setControlsVisible(false);
+    }, 3000);
+  };
+
+  const togglePlayPause = () => {
+    showControls();
+    setIsPlaying(prev => {
+      const isNowPlaying = !prev;
+      if (isNowPlaying) videoRef.current?.playAsync();
+      else videoRef.current?.pauseAsync();
+      return isNowPlaying;
+    });
+  };
+
+  useEffect(() => {
+    return () => {
+      if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
+      videoRef.current?.unloadAsync();
+    };
+  }, []);
+
+  return (
+    <View style={styles.container}>
+      <Pressable style={styles.videoContainer} onPress={showControls}>
+        <Video
+          ref={videoRef}
+          style={styles.video}
+          source={storyData.video} // ⚠️ ensure this is {uri: "..."} or require("...")
+          resizeMode={ResizeMode.CONTAIN}
+          shouldPlay={isPlaying}
+          onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
+        />
+      </Pressable>
+
+      {controlsVisible && appState === 'video' && (
+        <Pressable style={styles.controlsOverlay} onPress={togglePlayPause}>
+          <Text style={styles.controlButtonText}>{isPlaying ? '❚❚' : '▶'}</Text>
+        </Pressable>
+      )}
+
+      {appState === 'drawing' && currentInteraction && (
+        <View style={styles.drawingOverlay}>
+          <DrawingInterface
+            interaction={currentInteraction}
+            onContinueStory={handleContinueStory}
+          />
+        </View>
+      )}
+    </View>
+  );
 }
 
-// --- Stylesheet (No changes needed) ---
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   videoContainer: { flex: 1 },
   video: { ...StyleSheet.absoluteFillObject },
-  drawingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' },
-  controlsOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0,0, 0.3)' },
-  controlButtonText: { color: '#fff', fontSize: 60, textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: -1, height: 1 }, textShadowRadius: 10 },
-  drawingContainer: { justifyContent: 'center', alignItems: 'center', padding: 20, width: '100%', height: '100%' },
+  drawingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  controlsOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0,0, 0.3)',
+  },
+  controlButtonText: {
+    color: '#fff',
+    fontSize: 60,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 10,
+  },
+  drawingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    width: '100%',
+    height: '100%',
+  },
   title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
   outlineBox: { width: 300, height: 300, marginBottom: 30 },
   buttonRow: {
@@ -213,8 +227,5 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  popupText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
+  popupText: { fontSize: 20, fontWeight: 'bold' },
 });
