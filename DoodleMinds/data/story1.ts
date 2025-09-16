@@ -1,8 +1,16 @@
+// This interface defines each part of a drawing outline
+export interface OutlinePart {
+  id: string; // unique identifier for the part
+  name: string; // human-readable name (e.g., "body", "fin", "eye")
+  svgPath: string; // the SVG path for this part
+  fillColor?: string; // optional fill color (initially undefined)
+}
+
 // This interface defines the shape of our interaction point data
 export interface InteractionPoint {
   timestamp: number; // Time in milliseconds to pause the video
   prompt: string; // The text to show the user
-  outlineSvgPath: string; // The SVG path data for the drawing outline
+  outlineParts: OutlinePart[]; // Array of parts the user can interact with
 }
 
 // This interface defines the shape of our entire story object
@@ -19,18 +27,28 @@ export const storyData: Story = {
   title: 'Wiggles The Caterpillar',
   video: require('../assets/story1.mp4'), // Path to the video
   interactionPoints: [
-    {
-      timestamp: 15000, // Pause at 15 seconds
-      prompt: 'Help Wiggles! Draw him a yummy red apple!',
-      // SVG path for a simple circle (apple)
-      outlineSvgPath: 'M40 150 C40 100 120 100 180 150 C120 200 40 200 40 150 Z M180 150 L260 110 L260 190 L180 150 Z M70 145 A5 5 0 1 1 70 155 A5 5 0 1 1 70 145 Z',
-    },
-    {
-      timestamp: 35000, // Pause at 35 seconds
-      prompt: 'Now draw a bright, warm sun to help Wiggles grow!',
-      // SVG path for a sun with rays
-      outlineSvgPath: 'M150 50 A100 100 0 1 1 150 250 A100 100 0 1 1 150 50 Z',
-    },
-    // You can add as many other interaction points as you want here
-  ],
+  {
+    timestamp: 15000,
+    prompt: 'Help Wiggles! Color his Fish!',
+    outlineParts: [
+      {
+        id: 'apple_body',
+        name: 'Apple Body',
+        svgPath: 'M150 40 C100 40 100 120 150 180 C200 120 200 40 150 40 Z',
+      },
+      {
+        id: 'apple_leaf',
+        name: 'Apple Leaf',
+        svgPath: 'M150 180 L110 260 L190 260 L150 180 Z',
+      },
+      {
+        id: 'apple_spot',
+        name: 'Apple Spot',
+        svgPath: 'M145 70 A5 5 0 1 1 155 70 A5 5 0 1 1 145 70 Z',
+      },
+    ],
+  },
+  // ... rest unchanged
+]
+
 };

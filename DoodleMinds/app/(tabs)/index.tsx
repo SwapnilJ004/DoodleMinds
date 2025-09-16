@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, View, Text, Button, Pressable, Modal } from 'react-native';
+import { StyleSheet, View, Text, Button, Pressable, Modal, TouchableOpacity } from 'react-native';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import Svg, { Path } from 'react-native-svg';
 import { storyData, InteractionPoint } from '../../data/story1';
+
+const COLORS = ['red', 'blue', 'green', 'yellow', 'orange', 'purple'];
 
 const DrawingInterface = ({
   interaction,
@@ -11,43 +13,79 @@ const DrawingInterface = ({
   interaction: InteractionPoint;
   onContinueStory: () => void;
 }) => {
-  const [userPaths, setUserPaths] = useState<string[]>([]);
+  const [userPaths, setUserPaths] = useState<{ [partId: string]: string[] }>({});
+  const [fillColors, setFillColors] = useState<{ [partId: string]: string }>({});
+  const [currentColor, setCurrentColor] = useState<string>('blue');
+  const [selectedPartId, setSelectedPartId] = useState<string | null>(
+    interaction.outlineParts.length > 0 ? interaction.outlineParts[0].id : null
+  );
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const currentPath = useRef<string>('');
-
-  const checkTraceCompletion = (currentPaths: string[]) => {
-    const allPaths = currentPaths.join('');
-    const pointsDrawn = (allPaths.match(/ L/g) || []).length;
-
-    const COMPLETION_THRESHOLD_POINTS = 80;
-    if (pointsDrawn >= COMPLETION_THRESHOLD_POINTS) {
-      setShowSuccessPopup(true);
-      setTimeout(() => {
-        onContinueStory();
-      }, 2000);
-    }
-  };
+  const lastTouchLocation = useRef<{ x: number; y: number } | null>(null);
+  const touchStartTime = useRef<number>(0);
 
   const handleDrawingStart = (event: any) => {
+    if (!selectedPartId) return;
     const { locationX, locationY } = event.nativeEvent;
+    lastTouchLocation.current = { x: locationX, y: locationY };
+    touchStartTime.current = Date.now();
     currentPath.current = `M${locationX.toFixed(0)},${locationY.toFixed(0)}`;
-    setUserPaths(prev => [...prev, currentPath.current]);
+    setUserPaths(prev => ({
+      ...prev,
+      [selectedPartId]: [...(prev[selectedPartId] || []), currentPath.current],
+    }));
   };
 
   const handleDrawingMove = (event: any) => {
+    if (!selectedPartId) return;
     const { locationX, locationY } = event.nativeEvent;
+    lastTouchLocation.current = { x: locationX, y: locationY };
     const newPoint = ` L${locationX.toFixed(0)},${locationY.toFixed(0)}`;
     currentPath.current += newPoint;
-    setUserPaths(prev => [...prev.slice(0, -1), currentPath.current]);
+    setUserPaths(prev => ({
+      ...prev,
+      [selectedPartId]: [...(prev[selectedPartId] || []).slice(0, -1), currentPath.current],
+    }));
   };
 
-  const handleDrawingEnd = () => {
-    checkTraceCompletion(userPaths);
+  const handleDrawingEnd = (event: any) => {
+    if (!selectedPartId) return;
+    const { locationX, locationY } = event.nativeEvent;
+    const touchEndTime = Date.now();
+    const duration = touchEndTime - touchStartTime.current;
+    const distX = locationX - (lastTouchLocation.current?.x || 0);
+    const distY = locationY - (lastTouchLocation.current?.y || 0);
+    const distance = Math.sqrt(distX * distX + distY * distY);
+
+    if (duration < 200 && distance < 10) {
+      // Tap detected on selected part - fill it
+      setFillColors(prev => ({
+        ...prev,
+        [selectedPartId]: currentColor,
+      }));
+    }
+  };
+
+  // Handle tap with large invisible hit area so any part can be selected and filled reliably
+  const handleSelectAndFillPart = (partId: string) => {
+    setSelectedPartId(partId);
+    setFillColors(prev => ({
+      ...prev,
+      [partId]: currentColor,
+    }));
+  };
+
+  const handleSubmit = () => {
+    setShowSuccessPopup(true);
+    setTimeout(() => {
+      setShowSuccessPopup(false);
+      onContinueStory();
+    }, 1500);
   };
 
   return (
     <View style={styles.drawingContainer}>
-      <Text style={styles.title}>{interaction.prompt}</Text>
+      <Text style={styles.title}>{interaction.prompt} (Tap to fill, drag to draw)</Text>
       <View
         style={styles.outlineBox}
         onStartShouldSetResponder={() => true}
@@ -55,24 +93,65 @@ const DrawingInterface = ({
         onResponderMove={handleDrawingMove}
         onResponderRelease={handleDrawingEnd}
       >
-        <Svg height="100%" width="100%" viewBox="0 0 300 300">
-          <Path
-            d={interaction.outlineSvgPath}
-            stroke="#a9a9a9"
-            strokeWidth={3}
-            strokeDasharray="6, 6"
-            fill="none"
-          />
-          {userPaths.map((path, index) => (
-            <Path key={index} d={path} stroke="blue" strokeWidth={4} fill="none" />
-          ))}
-        </Svg>
-      </View>
-      <View style={styles.buttonRow}>
-        <Button title="Clear" onPress={() => setUserPaths([])} />
-        <Button title="Continue the Story" onPress={onContinueStory} />
+       <Svg height="100%" width="100%" viewBox="0 0 300 300">
+  {interaction.outlineParts.map(part => (
+    <Path
+      key={part.id}
+      d={part.svgPath}
+      stroke={selectedPartId === part.id ? 'black' : '#555'}
+      strokeWidth={12}      // increased for easier tap
+      strokeDasharray="6, 6"
+      fill={fillColors[part.id] || 'none'}
+      opacity={1}
+      onPressIn={() => handleSelectAndFillPart(part.id)}
+    />
+  ))}
+  {Object.entries(userPaths).map(([partId, paths]) =>
+    paths.map((path, idx) => (
+      <Path
+        key={`${partId}-${idx}`}
+        d={path}
+        stroke={currentColor}
+        strokeWidth={6}
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    ))
+  )}
+</Svg>
+
       </View>
 
+      {/* Color palette */}
+      <View style={styles.colorPalette}>
+        {COLORS.map(color => (
+          <TouchableOpacity
+            key={color}
+            style={[
+              styles.colorOption,
+              {
+                backgroundColor: color,
+                borderWidth: currentColor === color ? 3 : 1,
+              },
+            ]}
+            onPress={() => setCurrentColor(color)}
+          />
+        ))}
+      </View>
+
+      <View style={styles.buttonRow}>
+        <Button
+          title="Clear"
+          onPress={() => {
+            setUserPaths({});
+            setFillColors({});
+          }}
+        />
+        <Button title="Submit" onPress={handleSubmit} />
+      </View>
+
+      {/* Success Popup */}
       <Modal visible={showSuccessPopup} transparent animationType="fade">
         <View style={styles.popupContainer}>
           <View style={styles.popup}>
@@ -91,15 +170,15 @@ export default function HomeScreen() {
   const [currentInteraction, setCurrentInteraction] = useState<InteractionPoint | null>(null);
   const [completedTimestamps, setCompletedTimestamps] = useState<number[]>([]);
   const videoRef = useRef<Video>(null);
-  const hideControlsTimer = useRef<NodeJS.Timeout | null>(null);
+  const hideControlsTimer = useRef<number | null>(null);
 
   const handlePlaybackStatusUpdate = (status: AVPlaybackStatus) => {
     if (!status.isLoaded) return;
-
     const nextInteraction = storyData.interactionPoints.find(
-      point => status.positionMillis >= point.timestamp && !completedTimestamps.includes(point.timestamp)
+      point =>
+        status.positionMillis >= point.timestamp &&
+        !completedTimestamps.includes(point.timestamp)
     );
-
     if (nextInteraction) {
       videoRef.current?.pauseAsync();
       setIsPlaying(false);
@@ -147,19 +226,17 @@ export default function HomeScreen() {
         <Video
           ref={videoRef}
           style={styles.video}
-          source={storyData.video} // ⚠️ ensure this is {uri: "..."} or require("...")
+          source={storyData.video}
           resizeMode={ResizeMode.CONTAIN}
           shouldPlay={isPlaying}
           onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
         />
       </Pressable>
-
       {controlsVisible && appState === 'video' && (
         <Pressable style={styles.controlsOverlay} onPress={togglePlayPause}>
           <Text style={styles.controlButtonText}>{isPlaying ? '❚❚' : '▶'}</Text>
         </Pressable>
       )}
-
       {appState === 'drawing' && currentInteraction && (
         <View style={styles.drawingOverlay}>
           <DrawingInterface
@@ -203,7 +280,20 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
-  outlineBox: { width: 300, height: 300, marginBottom: 30 },
+  outlineBox: { width: 300, height: 300, marginBottom: 20 },
+  colorPalette: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 20,
+    flexWrap: 'wrap',
+  },
+  colorOption: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    margin: 5,
+    borderColor: '#333',
+  },
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
