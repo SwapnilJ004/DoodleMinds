@@ -6,13 +6,15 @@
     "paths": {
       "@/*": [
         "./*"
-      ]
+      ],
+    "typedRoots": ["./android/app/src/main/declarations.d.ts"]
     }
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.ts",
-    "expo-env.d.ts"
+    "expo-env.d.ts",
+    "src/**/*.d.ts"
   ]
 }
