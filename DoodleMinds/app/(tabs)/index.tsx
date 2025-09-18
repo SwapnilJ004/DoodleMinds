@@ -4,7 +4,8 @@ import { useRouter } from 'expo-router';
 import * as Animatable from 'react-native-animatable';
 import { useAudioPlayer } from 'expo-audio';
 
-import audioSource from '../../assets/logo_sound_effect.mp3';
+// ✅ Use require directly for mp3 assets
+const audioSource = require('../../assets/logo_sound_effect.mp3');
 
 export default function Index() {
   const navigation = useRouter();
@@ -13,20 +14,39 @@ export default function Index() {
   useEffect(() => {
     player.seekTo(0);
     player.play();
-    setTimeout(() => {
+
+    const timeout = setTimeout(() => {
       navigation.navigate('/(tabs)/juniorPlayback');
     }, 4000);
+
+    // ✅ cleanup timeout when component unmounts
+    return () => clearTimeout(timeout);
   }, []);
 
   return (
-    <View style={{ backgroundColor: "black", flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Animatable.Text style={{ color: 'white', fontSize: 36, fontWeight: '800' }} duration={2000} animation={'fadeIn'}>
+    <View style={styles.container}>
+      <Animatable.Text 
+        style={{ color: 'white', fontSize: 36, fontWeight: '800' }} 
+        duration={2000} 
+        animation="fadeIn"
+      >
         Doodle
       </Animatable.Text>
-      <Animatable.Text style={{ color: '#ff4d6d', fontSize: 36, fontWeight: '800' }} duration={2000} animation={'fadeInUp'}>
+
+      <Animatable.Text 
+        style={{ color: '#ff4d6d', fontSize: 36, fontWeight: '800' }} 
+        duration={2000} 
+        animation="fadeInUp"
+      >
         Minds
       </Animatable.Text>
-      <Animatable.Text style={{ color: 'white', fontSize: 10, fontWeight: '400'}} duration={500} delay={2500} animation={'lightSpeedIn'}>
+
+      <Animatable.Text 
+        style={{ color: 'white', fontSize: 10, fontWeight: '400' }} 
+        duration={500} 
+        delay={2500} 
+        animation="lightSpeedIn"
+      >
         The mindful sketch!
       </Animatable.Text>
     </View>
@@ -36,16 +56,8 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#25292e',
-    alignItems: 'center',
+    backgroundColor: 'black',
     justifyContent: 'center',
-  },
-  text: {
-    color: '#fff',
-  },
-  button: {
-    fontSize: 20,
-    textDecorationLine: 'underline',
-    color: '#fff',
+    alignItems: 'center',
   },
 });
