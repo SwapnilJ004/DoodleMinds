@@ -1,36 +1,51 @@
 // app/(tabs)/landing.tsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import * as Animatable from 'react-native-animatable';
+
+import audioSource from "../../assets/BackgroundMusic.mp3";
+import { useAudioPlayer } from 'expo-audio';
 
 export default function LandingPage() {
   const router = useRouter();
+  const player = useAudioPlayer(audioSource);
+
+  const pathName = usePathname();
+
+  useEffect(() => {
+    if(pathName == '/landing')
+    {
+      player.seekTo(10);
+      player.play();
+      player.loop = true;
+    }
+  })
 
   return (
     <View style={styles.container}>
       {/* Title */}
-      <Animatable.Text 
-        animation="fadeInDown" 
-        duration={1500} 
+      <Animatable.Text
+        animation="fadeInDown"
+        duration={1500}
         style={styles.title}
       >
         Welcome to
       </Animatable.Text>
 
-      <Animatable.Text 
-        animation="pulse" 
-        iterationCount="infinite" 
+      <Animatable.Text
+        animation="pulse"
+        iterationCount="infinite"
         style={styles.appName}
       >
         Doodle Minds 🎨
       </Animatable.Text>
 
       {/* Subtitle */}
-      <Animatable.Text 
-        animation="fadeInUp" 
-        delay={800} 
-        duration={1500} 
+      <Animatable.Text
+        animation="fadeInUp"
+        delay={800}
+        duration={1500}
         style={styles.subtitle}
       >
         Let your imagination guide the story!
@@ -38,8 +53,8 @@ export default function LandingPage() {
 
       {/* Button */}
       <Animatable.View animation="zoomIn" delay={1500} duration={1200}>
-        <TouchableOpacity 
-          style={styles.playButton} 
+        <TouchableOpacity
+          style={styles.playButton}
           onPress={() => router.push('/(tabs)/juniorPlayback')}
         >
           <Text style={styles.playButtonText}>▶ Play Story 1</Text>

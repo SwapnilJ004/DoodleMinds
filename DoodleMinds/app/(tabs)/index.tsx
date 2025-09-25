@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import * as Animatable from "react-native-animatable";
 import { useAudioPlayer } from "expo-audio";
 
-const audioSource = require("../../assets/logo_sound_effect.mp3");
+import audioSource from "../../assets/logo_sound_effect.mp3";
 
 export default function Index() {
   const navigation = useRouter();
