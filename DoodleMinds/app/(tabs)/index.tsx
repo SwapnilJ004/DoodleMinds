@@ -1,11 +1,10 @@
-import { Text, View, StyleSheet } from 'react-native';
-import { useEffect } from 'react';
-import { useRouter } from 'expo-router';
-import * as Animatable from 'react-native-animatable';
-import { useAudioPlayer } from 'expo-audio';
+import { Text, View, StyleSheet } from "react-native";
+import { useEffect } from "react";
+import { useRouter } from "expo-router";
+import * as Animatable from "react-native-animatable";
+import { useAudioPlayer } from "expo-audio";
 
-// ✅ Use require directly for mp3 assets
-const audioSource = require('../../assets/logo_sound_effect.mp3');
+const audioSource = require("../../assets/logo_sound_effect.mp3");
 
 export default function Index() {
   const navigation = useRouter();
@@ -16,8 +15,9 @@ export default function Index() {
     player.play();
 
     const timeout = setTimeout(() => {
-      navigation.navigate('/(tabs)/juniorPlayback');
+      navigation.push('/(tabs)/landing' as never);
     }, 4000);
+
 
     // ✅ cleanup timeout when component unmounts
     return () => clearTimeout(timeout);
@@ -25,26 +25,26 @@ export default function Index() {
 
   return (
     <View style={styles.container}>
-      <Animatable.Text 
-        style={{ color: 'white', fontSize: 36, fontWeight: '800' }} 
-        duration={2000} 
+      <Animatable.Text
+        style={{ color: "white", fontSize: 36, fontWeight: "800" }}
+        duration={2000}
         animation="fadeIn"
       >
         Doodle
       </Animatable.Text>
 
-      <Animatable.Text 
-        style={{ color: '#ff4d6d', fontSize: 36, fontWeight: '800' }} 
-        duration={2000} 
+      <Animatable.Text
+        style={{ color: "#ff4d6d", fontSize: 36, fontWeight: "800" }}
+        duration={2000}
         animation="fadeInUp"
       >
         Minds
       </Animatable.Text>
 
-      <Animatable.Text 
-        style={{ color: 'white', fontSize: 10, fontWeight: '400' }} 
-        duration={500} 
-        delay={2500} 
+      <Animatable.Text
+        style={{ color: "white", fontSize: 10, fontWeight: "400" }}
+        duration={500}
+        delay={2500}
         animation="lightSpeedIn"
       >
         The mindful sketch!
@@ -56,8 +56,8 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'black',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "black",
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
