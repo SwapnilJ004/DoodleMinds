@@ -1,10 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, View, Text, Button, Pressable, Modal, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, Button, Pressable, Modal, TouchableOpacity, Animated } from 'react-native';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import Svg, { Path } from 'react-native-svg';
 import { storyData, InteractionPoint } from '../../data/story1';
 
-const COLORS = ['red', 'blue', 'green', 'yellow', 'orange', 'purple'];
+const COLORS = [
+  { name: 'red', color: '#FF6B6B' },
+  { name: 'blue', color: '#4ECDC4' },
+  { name: 'green', color: '#95E1D3' },
+  { name: 'yellow', color: '#FFE66D' },
+  { name: 'orange', color: '#FF8B4D' },
+  { name: 'purple', color: '#C792EA' },
+  { name: 'pink', color: '#FF9CEE' },
+  { name: 'brown', color: '#A67C52' },
+];
 
 const DrawingInterface = ({
   interaction,
@@ -15,14 +24,34 @@ const DrawingInterface = ({
 }) => {
   const [userPaths, setUserPaths] = useState<{ [partId: string]: string[] }>({});
   const [fillColors, setFillColors] = useState<{ [partId: string]: string }>({});
-  const [currentColor, setCurrentColor] = useState<string>('blue');
+  const [currentColor, setCurrentColor] = useState<string>(COLORS[0].color);
   const [selectedPartId, setSelectedPartId] = useState<string | null>(
     interaction.outlineParts.length > 0 ? interaction.outlineParts[0].id : null
   );
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [brushSize, setBrushSize] = useState<number>(4);
+  const [showInstructions, setShowInstructions] = useState(true);
+  
   const currentPath = useRef<string>('');
   const lastTouchLocation = useRef<{ x: number; y: number } | null>(null);
   const touchStartTime = useRef<number>(0);
+  
+  // Animation values
+  const successScale = useRef(new Animated.Value(0)).current;
+  const instructionOpacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    // Hide instructions after 3 seconds
+    const timer = setTimeout(() => {
+      Animated.timing(instructionOpacity, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }).start(() => setShowInstructions(false));
+    }, 3000);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleDrawingStart = (event: any) => {
     if (!selectedPartId) return;
@@ -58,7 +87,6 @@ const DrawingInterface = ({
     const distance = Math.sqrt(distX * distX + distY * distY);
 
     if (duration < 200 && distance < 10) {
-      // Tap detected on selected part - fill it
       setFillColors(prev => ({
         ...prev,
         [selectedPartId]: currentColor,
@@ -66,7 +94,6 @@ const DrawingInterface = ({
     }
   };
 
-  // Handle tap with large invisible hit area so any part can be selected and filled reliably
   const handleSelectAndFillPart = (partId: string) => {
     setSelectedPartId(partId);
     setFillColors(prev => ({
@@ -77,86 +104,162 @@ const DrawingInterface = ({
 
   const handleSubmit = () => {
     setShowSuccessPopup(true);
+    successScale.setValue(0);
+    Animated.spring(successScale, {
+      toValue: 1,
+      friction: 4,
+      tension: 40,
+      useNativeDriver: true,
+    }).start();
+    
     setTimeout(() => {
       setShowSuccessPopup(false);
       onContinueStory();
-    }, 1500);
+    }, 2000);
+  };
+
+  const handleClear = () => {
+    setUserPaths({});
+    setFillColors({});
   };
 
   return (
     <View style={styles.drawingContainer}>
-      <Text style={styles.title}>{interaction.prompt} (Tap to fill, drag to draw)</Text>
-      <View
-        style={styles.outlineBox}
-        onStartShouldSetResponder={() => true}
-        onResponderGrant={handleDrawingStart}
-        onResponderMove={handleDrawingMove}
-        onResponderRelease={handleDrawingEnd}
-      >
-        <Svg height="100%" width="100%" viewBox="0 0 300 300">
-          {interaction.outlineParts.map(part => (
-            <Path
-              key={part.id}
-              d={part.svgPath}
-              stroke={selectedPartId === part.id ? 'black' : '#555'}
-              strokeWidth={12}      // increased for easier tap
-              strokeDasharray="6, 6"
-              fill={fillColors[part.id] || 'none'}
-              opacity={1}
-              onPressIn={() => handleSelectAndFillPart(part.id)}
-            />
-          ))}
-          {Object.entries(userPaths).map(([partId, paths]) =>
-            paths.map((path, idx) => (
+      <View style={styles.headerSection}>
+        <Text style={styles.title}>{interaction.prompt}</Text>
+        {showInstructions && (
+          <Animated.View style={[styles.instructionBubble, { opacity: instructionOpacity }]}>
+            <Text style={styles.instructionText}>👆 Tap to fill • ✏️ Draw to color</Text>
+          </Animated.View>
+        )}
+      </View>
+
+      <View style={styles.canvasSection}>
+        <View
+          style={styles.outlineBox}
+          onStartShouldSetResponder={() => true}
+          onResponderGrant={handleDrawingStart}
+          onResponderMove={handleDrawingMove}
+          onResponderRelease={handleDrawingEnd}
+        >
+          <Svg height="100%" width="100%" viewBox="0 0 300 300">
+            {interaction.outlineParts.map(part => (
               <Path
-                key={`${partId}-${idx}`}
-                d={path}
-                stroke={currentColor}
-                strokeWidth={6}
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+                key={part.id}
+                d={part.svgPath}
+                stroke={selectedPartId === part.id ? '#333' : '#999'}
+                strokeWidth={selectedPartId === part.id ? 3 : 2}
+                strokeDasharray="8, 4"
+                fill={fillColors[part.id] || 'white'}
+                opacity={1}
+                onPressIn={() => handleSelectAndFillPart(part.id)}
               />
-            ))
-          )}
-        </Svg>
+            ))}
+            {Object.entries(userPaths).map(([partId, paths]) =>
+              paths.map((path, idx) => (
+                <Path
+                  key={`${partId}-${idx}`}
+                  d={path}
+                  stroke={currentColor}
+                  strokeWidth={brushSize}
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity={0.9}
+                />
+              ))
+            )}
+          </Svg>
+        </View>
 
+        {/* Selected part indicator */}
+        {selectedPartId && (
+          <View style={styles.selectedPartIndicator}>
+            <View style={[styles.selectedColorDot, { backgroundColor: currentColor }]} />
+            <Text style={styles.selectedPartText}>Drawing on part {selectedPartId}</Text>
+          </View>
+        )}
       </View>
 
-      {/* Color palette */}
-      <View style={styles.colorPalette}>
-        {COLORS.map(color => (
-          <TouchableOpacity
-            key={color}
-            style={[
-              styles.colorOption,
-              {
-                backgroundColor: color,
-                borderWidth: currentColor === color ? 3 : 1,
-              },
-            ]}
-            onPress={() => setCurrentColor(color)}
-          />
-        ))}
+      {/* Tools Section */}
+      <View style={styles.toolsSection}>
+        {/* Color palette */}
+        <View style={styles.colorSection}>
+          <Text style={styles.sectionLabel}>Colors</Text>
+          <View style={styles.colorPalette}>
+            {COLORS.map(({ name, color }) => (
+              <TouchableOpacity
+                key={name}
+                style={[
+                  styles.colorOption,
+                  {
+                    backgroundColor: color,
+                    borderWidth: currentColor === color ? 4 : 2,
+                    borderColor: currentColor === color ? '#333' : '#ddd',
+                    transform: [{ scale: currentColor === color ? 1.1 : 1 }],
+                  },
+                ]}
+                onPress={() => setCurrentColor(color)}
+                activeOpacity={0.7}
+              />
+            ))}
+          </View>
+        </View>
+
+        {/* Brush size selector */}
+        <View style={styles.brushSection}>
+          <Text style={styles.sectionLabel}>Brush Size</Text>
+          <View style={styles.brushOptions}>
+            {[2, 4, 6, 8].map(size => (
+              <TouchableOpacity
+                key={size}
+                style={[
+                  styles.brushOption,
+                  brushSize === size && styles.brushOptionSelected,
+                ]}
+                onPress={() => setBrushSize(size)}
+              >
+                <View
+                  style={[
+                    styles.brushPreview,
+                    {
+                      width: size * 3,
+                      height: size * 3,
+                      backgroundColor: currentColor,
+                    },
+                  ]}
+                />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
       </View>
 
+      {/* Action buttons */}
       <View style={styles.buttonRow}>
-        <Button
-          title="Clear"
-          onPress={() => {
-            setUserPaths({});
-            setFillColors({});
-          }}
-        />
-        <Button title="Submit" onPress={handleSubmit} />
+        <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
+          <Text style={styles.clearButtonText}>🗑️ Clear All</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+          <Text style={styles.submitButtonText}>✨ Done!</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Success Popup */}
       <Modal visible={showSuccessPopup} transparent animationType="fade">
         <View style={styles.popupContainer}>
-          <View style={styles.popup}>
-            <Text style={styles.popupText}>Well done! 🎉</Text>
-          </View>
+          <Animated.View 
+            style={[
+              styles.popup,
+              {
+                transform: [{ scale: successScale }]
+              }
+            ]}
+          >
+            <Text style={styles.popupEmoji}>🎨</Text>
+            <Text style={styles.popupText}>Amazing Work!</Text>
+            <Text style={styles.popupSubtext}>Your drawing is beautiful! ✨</Text>
+          </Animated.View>
         </View>
       </Modal>
     </View>
@@ -255,7 +358,7 @@ const styles = StyleSheet.create({
   video: { ...StyleSheet.absoluteFillObject },
   drawingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#FFF8F0',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -263,59 +366,216 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0,0, 0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   controlButtonText: {
     color: '#fff',
     fontSize: 60,
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: -1, height: 1 },
-    textShadowRadius: 10
+    textShadowRadius: 10,
   },
   drawingContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    flex: 1,
+    padding: 16,
     width: '100%',
     height: '100%',
   },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
-  outlineBox: { width: 300, height: 300, marginBottom: 20 },
+  headerSection: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center',
+    color: '#333',
+  },
+  instructionBubble: {
+    backgroundColor: '#FFE66D',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  instructionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  canvasSection: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  outlineBox: {
+    width: 300,
+    height: 300,
+    backgroundColor: 'white',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  selectedPartIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  selectedColorDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginRight: 8,
+    borderWidth: 2,
+    borderColor: '#333',
+  },
+  selectedPartText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  toolsSection: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  colorSection: {
+    marginBottom: 12,
+  },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#555',
+    marginBottom: 8,
+  },
   colorPalette: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 20,
     flexWrap: 'wrap',
   },
   colorOption: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    margin: 5,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    margin: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  brushSection: {},
+  brushOptions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  brushOption: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: 4,
+    borderWidth: 2,
+    borderColor: '#ddd',
+  },
+  brushOptionSelected: {
+    backgroundColor: '#FFE66D',
     borderColor: '#333',
+  },
+  brushPreview: {
+    borderRadius: 100,
   },
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     width: '100%',
   },
+  clearButton: {
+    backgroundColor: '#FF6B6B',
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  clearButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  submitButton: {
+    backgroundColor: '#4ECDC4',
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  submitButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   popupContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   popup: {
-    width: 200,
-    padding: 20,
+    width: 260,
+    padding: 32,
     backgroundColor: 'white',
-    borderRadius: 10,
+    borderRadius: 24,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 10,
   },
-  popupText: { fontSize: 20, fontWeight: 'bold' },
+  popupEmoji: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  popupText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  popupSubtext: {
+    fontSize: 16,
+    color: '#666',
+  },
 });
