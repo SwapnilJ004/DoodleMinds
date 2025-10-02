@@ -2,25 +2,35 @@ import { Text, View, StyleSheet } from "react-native";
 import { useEffect } from "react";
 import { useRouter } from "expo-router";
 import * as Animatable from "react-native-animatable";
-import { useAudioPlayer } from "expo-audio";
-
-import audioSource from "../../assets/logo_sound_effect.mp3";
+import { Audio } from "expo-av";
 
 export default function Index() {
   const navigation = useRouter();
-  const player = useAudioPlayer(audioSource);
 
   useEffect(() => {
-    player.seekTo(0);
-    player.play();
+    let sound: Audio.Sound | null = null;
+
+    async function playSound() {
+      const { sound: playbackObj } = await Audio.Sound.createAsync(
+        require("../../assets/logo_sound_effect.mp3") // ✅ use require
+      );
+      sound = playbackObj;
+      await sound.playAsync();
+    }
+
+    playSound();
 
     const timeout = setTimeout(() => {
-      navigation.push('/(tabs)/landing' as never);
+      navigation.push("/(tabs)/landing" as never);
     }, 4000);
 
-
-    // ✅ cleanup timeout when component unmounts
-    return () => clearTimeout(timeout);
+    // cleanup: stop sound + clear timeout
+    return () => {
+      if (sound) {
+        sound.unloadAsync();
+      }
+      clearTimeout(timeout);
+    };
   }, []);
 
   return (
