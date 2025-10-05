@@ -1,9 +1,8 @@
 // This interface defines each part of a drawing outline
 export interface OutlinePart {
-  id: string; // unique identifier for the part
-  name: string; // human-readable name (e.g., "body", "fin", "eye")
+  id: string; // unique identifier for the part, e.g., 'fish_body'
+  name: string; // human-readable name, e.g., "Body"
   svgPath: string; // the SVG path for this part
-  fillColor?: string; // optional fill color (initially undefined)
 }
 
 // This interface defines the shape of our interaction point data
@@ -13,42 +12,38 @@ export interface InteractionPoint {
   outlineParts: OutlinePart[]; // Array of parts the user can interact with
 }
 
-// This interface defines the shape of our entire story object
 export interface Story {
   id: string;
   title: string;
-  video: any; // Using 'any' for the require() statement
+  video: any; 
   interactionPoints: InteractionPoint[];
 }
 
-// Here is the actual data for our first story
 export const storyData: Story = {
-  id: 'wiggles-the-caterpillar',
-  title: 'Wiggles The Caterpillar',
-  video: require('../assets/story1.mp4'), // Path to the video
+  id: 'Clever-Fish',
+  title: 'Clever Fish',
+  video: require('../assets/story1.mp4'),
   interactionPoints: [
-  {
-    timestamp: 15000,
-    prompt: 'Help Wiggles! Color his Fish!',
-    outlineParts: [
-      {
-        id: 'apple_body',
-        name: 'Apple Body',
-        svgPath: 'M150 40 C100 40 100 120 150 180 C200 120 200 40 150 40 Z',
-      },
-      {
-        id: 'apple_leaf',
-        name: 'Apple Leaf',
-        svgPath: 'M150 180 L110 260 L190 260 L150 180 Z',
-      },
-      {
-        id: 'apple_spot',
-        name: 'Apple Spot',
-        svgPath: 'M145 70 A5 5 0 1 1 155 70 A5 5 0 1 1 145 70 Z',
-      },
-    ],
-  },
-  // ... rest unchanged
-]
-
+    {
+      timestamp: 15000,
+      prompt: 'Look! A little fish. Can you color it in?',
+      outlineParts: [
+        {
+          id: 'fish_body',
+          name: 'Body',
+          svgPath: 'M40 150 C40 100 120 100 180 150 C120 200 40 200 40 150 Z',
+        },
+        {
+          id: 'fish_tail',
+          name: 'Tail',
+          svgPath: 'M180 150 L260 110 L260 190 L180 150 Z',
+        },
+        {
+          id: 'fish_eye',
+          name: 'Eye',
+          svgPath: 'M70 145 A5 5 0 1 1 70 155 A5 5 0 1 1 70 145 Z',
+        },
+      ],
+    },
+  ],
 };
