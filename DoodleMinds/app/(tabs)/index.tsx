@@ -1,13 +1,24 @@
 // app/(tabs)/index.tsx
 import { Text, View, StyleSheet, TouchableOpacity } from "react-native";
 import { useEffect, useState } from "react";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import * as Animatable from "react-native-animatable";
 import { Audio } from "expo-av";
+import { useAudioPlayer } from 'expo-audio';
+import audioSource from '../../assets/BackgroundMusic.mp3';
 
 export default function Index() {
   const router = useRouter();
   const [showAgeSelection, setShowAgeSelection] = useState(false);
+  const player = useAudioPlayer(audioSource);
+
+  useFocusEffect(() => {
+    setTimeout(() => {
+      player.seekTo(10);
+      player.play();
+    }, 3000);
+  });
+
 
   useEffect(() => {
     let sound: Audio.Sound | null = null;

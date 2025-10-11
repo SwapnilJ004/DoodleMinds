@@ -1,37 +1,12 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Animatable from 'react-native-animatable';
-import { Audio } from 'expo-av';
+import { useAudioPlayer } from 'expo-audio';
+import audioSource from '../../assets/BackgroundMusic.mp3';
 
 export default function LandingPage() {
   const router = useRouter();
-
-  useFocusEffect(
-    useCallback(() => {
-      let soundObject: Audio.Sound | null = null;
-
-      async function playMusic() {
-        try {
-          const { sound } = await Audio.Sound.createAsync(
-            require('../../assets/BackgroundMusic.mp3'),
-            { shouldPlay: true, isLooping: true }
-          );
-          soundObject = sound;
-        } catch (error) {
-          console.error("Error playing background music:", error);
-        }
-      }
-
-      playMusic();
-
-      return () => {
-        if (soundObject) {
-          soundObject.unloadAsync();
-        }
-      };
-    }, [])
-  );
 
   return (
     <View style={styles.container}>
@@ -69,7 +44,7 @@ export default function LandingPage() {
             </View>
           </TouchableOpacity>
         </Animatable.View>
-        
+
         <Animatable.View animation="slideInUp" delay={2000} duration={1500} style={styles.charactersContainer}>
           <Animatable.Text animation="bounce" iterationCount="infinite" duration={2000} style={styles.character}>🦄</Animatable.Text>
           <Animatable.Text animation="bounce" iterationCount="infinite" duration={2000} delay={300} style={styles.character}>🎈</Animatable.Text>

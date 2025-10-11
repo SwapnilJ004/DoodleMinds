@@ -13,6 +13,8 @@ import {
 import { useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 import * as Animatable from 'react-native-animatable';
+import { useAudioPlayer } from 'expo-audio';
+import audioSource from '../../assets/BackgroundMusic.mp3';
 
 // Word list for the game
 const WORD_LIST = [
@@ -67,6 +69,7 @@ export default function ScribbleGame() {
   // Timer
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [currentPlayerId, setCurrentPlayerId] = useState('');
+  const player = useAudioPlayer(audioSource);
 
   // Generate random player ID on mount
   useEffect(() => {
@@ -92,6 +95,7 @@ export default function ScribbleGame() {
   }, [gameState]);
 
   const handleJoinGame = () => {
+    player.pause();
     if (currentPlayerName.trim()) {
       const newPlayer: Player = {
         id: currentPlayerId,
@@ -104,11 +108,12 @@ export default function ScribbleGame() {
     }
   };
 
-  const handleStartGame = () => {
+  const handleStartGame = (player) => {
     if (players.length < 2) {
       alert('Need at least 2 players to start!');
       return;
     }
+    player.pause();
     startNewRound();
   };
 
@@ -219,7 +224,7 @@ export default function ScribbleGame() {
   };
 
   // Render functions
-  const renderLobby = () => (
+  const renderLobby = (audioPlayer) => (
     <View style={styles.lobbyContainer}>
       <Animatable.Text animation="bounceIn" style={styles.gameTitle}>
         🎨 Scribble Guess! 🎨
@@ -257,7 +262,7 @@ export default function ScribbleGame() {
 
       {players.length >= 2 && (
         <Animatable.View animation="pulse" iterationCount="infinite">
-          <TouchableOpacity style={styles.startButton} onPress={handleStartGame}>
+          <TouchableOpacity style={styles.startButton} onPress={()=> handleStartGame(audioPlayer)}>
             <Text style={styles.startButtonText}>🎮 Start Game!</Text>
           </TouchableOpacity>
         </Animatable.View>
@@ -461,7 +466,7 @@ export default function ScribbleGame() {
 
   return (
     <View style={styles.container}>
-      {gameState === 'lobby' && renderLobby()}
+      {gameState === 'lobby' && renderLobby(audioPlayer)}
       {(gameState === 'drawing' || gameState === 'guessing') && renderDrawing()}
       {gameState === 'reveal' && renderReveal()}
       {gameState === 'gameover' && renderGameOver()}

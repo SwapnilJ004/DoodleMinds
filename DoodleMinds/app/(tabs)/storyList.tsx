@@ -1,15 +1,18 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { allStories } from '../../data';
+import { useAudioPlayer } from 'expo-audio';
+import audioSource from '../../assets/BackgroundMusic.mp3';
 
 export default function StoryList() {
   const router = useRouter();
+  const player = useAudioPlayer(audioSource);
 
   const handleSelectStory = (storyId: string) => {
     router.push({
       pathname: '/(tabs)/juniorPlayback',
-      params: { storyId: storyId }, 
+      params: { storyId: storyId },
     });
   };
 
@@ -51,7 +54,7 @@ export default function StoryList() {
           const [color1, color2] = getCardColor(index);
           return (
             <TouchableOpacity
-              style={[styles.storyCard, { 
+              style={[styles.storyCard, {
                 backgroundColor: color1,
               }]}
               onPress={() => handleSelectStory(item.id)}
