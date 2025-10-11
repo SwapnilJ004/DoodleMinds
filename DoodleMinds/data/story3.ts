@@ -6,8 +6,9 @@ export const storyData3: Story = {
   video: require('../assets/story3.mp4'),
   interactionPoints: [
     {
-      timestamp: 20000, 
-      prompt: 'The sun is shining brightly! Let\'s color it!',
+      timestamp: 20000,
+      prompt: "The sun is shining brightly! Let's color it!",
+      image: require('../assets/sun.png'), // 👈 Add your image reference here
       outlineParts: [
         { id: 'sun_face', name: 'Sun Face', svgPath: 'M150 150 m-60 0 a60 60 0 1 0 120 0 a60 60 0 1 0 -120 0' },
         { id: 'sun_ray_top', name: 'Ray', svgPath: 'M150 70 L140 40 L160 40 Z' },
@@ -18,7 +19,8 @@ export const storyData3: Story = {
     },
     {
       timestamp: 53000,
-      prompt: 'Let\'s make a tasty omelette!',
+      prompt: "Let's make a tasty omelette!",
+      image: require("../assets/omlet.png"),
       outlineParts: [
         {
           id: 'omelette_body',

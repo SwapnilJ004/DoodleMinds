@@ -9,7 +9,8 @@ export interface OutlinePart {
 export interface InteractionPoint {
   timestamp: number; // Time in milliseconds to pause the video
   prompt: string; // The text to show the user
-  outlineParts: OutlinePart[]; // Array of parts the user can interact with
+  outlineParts: OutlinePart[];
+  image?: any; // Array of parts the user can interact with
 }
 
 export interface Story {
@@ -27,6 +28,7 @@ export const storyData: Story = {
     {
       timestamp: 15000,
       prompt: 'Look! A little fish. Can you color it in?',
+      image: require("../assets/fish.png"),
       outlineParts: [
         {
           id: 'fish_body',
