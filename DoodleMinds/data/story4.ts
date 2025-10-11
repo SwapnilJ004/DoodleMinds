@@ -8,6 +8,7 @@ export const storyData4: Story = {
     {
       timestamp: 18000,
       prompt: 'This is the pot for carrying water. Let\'s color it!',
+      image: require("../assets/pot.png"),
       outlineParts: [
         { id: 'pot_body', name: 'Pot Body', svgPath: 'M60 120 C 10 250, 290 250, 240 120' },
         { id: 'pot_neck', name: 'Pot Neck', svgPath: 'M120 70 C 110 130, 190 130, 180 70' },
@@ -17,6 +18,7 @@ export const storyData4: Story = {
     {
       timestamp: 100000,
       prompt: 'Let\'s draw a beautiful flower!',
+      image: require("../assets/flower.png"),
       outlineParts: [
         {
           id: 'flower_center',
