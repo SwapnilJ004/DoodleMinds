@@ -8,6 +8,7 @@ export const storyData2: Story = {
     {
       timestamp: 14000,
       prompt: 'The bees need a home. Can you color their beehive?',
+      image: require('../assets/beehive.png'),
       outlineParts: [
         { id: 'hive_body', name: 'Hive Body', svgPath: 'M50 150 C50 80, 250 80, 250 150 C250 220, 50 220, 50 150 Z' },
         { id: 'hive_layer1', name: 'Middle Stripe', svgPath: 'M55 140 C55 110, 245 110, 245 140' },
@@ -18,6 +19,7 @@ export const storyData2: Story = {
     {
       timestamp: 32000, 
       prompt: 'The bear loves honey! Let\'s color his honey pot.',
+      image: require("../assets/honeypot.png"),
       outlineParts: [
         {
           id: 'pot_body',
