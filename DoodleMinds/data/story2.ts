@@ -4,6 +4,7 @@ export const storyData2: Story = {
   id: 'the-bear-and-the-bee',
   title: 'The Bear and the Bee',
   video: require('../assets/story2.mp4'),
+  language: 'en',
   interactionPoints: [
     {
       timestamp: 14000,
