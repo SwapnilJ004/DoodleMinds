@@ -1,3 +1,4 @@
+import { Audio } from 'expo-av';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
