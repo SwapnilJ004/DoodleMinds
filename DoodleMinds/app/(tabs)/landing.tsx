@@ -1,6 +1,6 @@
 import { Audio } from 'expo-av';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Animatable from 'react-native-animatable';
 import { useAudioPlayer } from 'expo-audio';
@@ -8,33 +8,69 @@ import audioSource from '../../assets/BackgroundMusic.mp3';
 
 export default function LandingPage() {
   const router = useRouter();
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const [isSoundLoaded, setIsSoundLoaded] = useState(false);
+  useEffect(() => {
+    async function createSound() {
+      try {
+        const { sound } = await Audio.Sound.createAsync(
+          require("../../assets/BackgroundMusic.mp3"),
+          { isLooping: true } 
+        );
+        soundRef.current = sound;
+        setIsSoundLoaded(true);
+      } catch (error) {
+        console.error("Error creating background music:", error);
+      }
+    }
+
+    createSound();
+
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+      }
+    };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      let soundObject: Audio.Sound | null = null;
-
-      async function playMusic() {
-        try {
-          const { sound } = await Audio.Sound.createAsync(
-            require("../../assets/BackgroundMusic.mp3"),
-            { shouldPlay: true, isLooping: true }
-          );
-          soundObject = sound;
-        } catch (error) {
-          console.error("Error playing background music:", error);
-        }
+      if (isSoundLoaded && soundRef.current) {
+        soundRef.current.playAsync();
       }
-
-      playMusic();
-
       return () => {
-        if (soundObject) {
-          soundObject.unloadAsync();
+        if (isSoundLoaded && soundRef.current) {
+          soundRef.current.pauseAsync();
         }
       };
-    }, [])
+    }, [isSoundLoaded])
   );
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     let soundObject: Audio.Sound | null = null;
 
+  //     async function playMusic() {
+  //       try {
+  //         const { sound } = await Audio.Sound.createAsync(
+  //           require("../../assets/BackgroundMusic.mp3"),
+  //           { shouldPlay: true, isLooping: true }
+  //         );
+  //         soundObject = sound;
+  //       } catch (error) {
+  //         console.error("Error playing background music:", error);
+  //       }
+  //     }
+
+  //     playMusic();
+
+  //     return () => {
+  //       if (soundObject) {
+  //         soundObject.unloadAsync();
+  //       }
+  //     };
+  //   }, [])
+  // );
+  
   return (
     <View style={styles.container}>
       {/* Floating Stars Background Elements */}
