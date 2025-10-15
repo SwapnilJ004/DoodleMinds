@@ -1,24 +1,42 @@
 // app/(tabs)/index.tsx
 import { Text, View, StyleSheet, TouchableOpacity } from "react-native";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as Animatable from "react-native-animatable";
 import { Audio } from "expo-av";
-import { useAudioPlayer } from 'expo-audio';
-import audioSource from '../../assets/BackgroundMusic.mp3';
 
 export default function Index() {
   const router = useRouter();
   const [showAgeSelection, setShowAgeSelection] = useState(false);
-  const player = useAudioPlayer(audioSource);
+  const backgroundSoundRef = useRef<Audio.Sound | null>(null);
 
+  // Play background music when screen is focused
   useFocusEffect(() => {
-    setTimeout(() => {
-      player.seekTo(10);
-      player.play();
-    }, 3000);
-  });
+    let isActive = true;
 
+    async function playBackgroundMusic() {
+      if (backgroundSoundRef.current) {
+        await backgroundSoundRef.current.setPositionAsync(10000); // Seek to 10s
+        await backgroundSoundRef.current.playAsync();
+        return;
+      }
+      const { sound } = await Audio.Sound.createAsync(
+        require("../../assets/BackgroundMusic.mp3"),
+        { shouldPlay: true, positionMillis: 10000, isLooping: true }
+      );
+      backgroundSoundRef.current = sound;
+      if (isActive) {
+        await sound.playAsync();
+      }
+    }
+
+    playBackgroundMusic();
+
+    return () => {
+      isActive = false;
+      // Optional: background music keeps playing in memory, or unload if navigating away
+    };
+  });
 
   useEffect(() => {
     let sound: Audio.Sound | null = null;
@@ -33,7 +51,6 @@ export default function Index() {
 
     playSound();
 
-    // Show age selection after logo animation
     const timeout = setTimeout(() => {
       setShowAgeSelection(true);
     }, 3500);
