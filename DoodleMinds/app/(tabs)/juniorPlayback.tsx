@@ -6,7 +6,7 @@ import { Asset } from "expo-asset";
 import {
   StyleSheet,
   View,
-  Text,
+  Text, 
   Pressable,
   Modal,
   TouchableOpacity,
