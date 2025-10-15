@@ -6,7 +6,7 @@ import { Asset } from "expo-asset";
 import {
   StyleSheet,
   View,
-  Text,
+  Text, 
   Pressable,
   Modal,
   TouchableOpacity,
@@ -25,6 +25,7 @@ const COLORS = [
   { name: "yellow", color: "#FFE66D" },
   { name: "orange", color: "#FF8B4D" },
   { name: "purple", color: "#C792EA" },
+  { name: "black", color: "#000000" }, 
 ];
 
 const DrawingInterface = ({
