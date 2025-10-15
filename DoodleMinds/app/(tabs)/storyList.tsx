@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { allStories } from '../../data';
 import { useAudioPlayer } from 'expo-audio';
 import audioSource from '../../assets/BackgroundMusic.mp3';
 
 export default function StoryList() {
   const router = useRouter();
-  const player = useAudioPlayer(audioSource);
+  const { lang } = useLocalSearchParams<{ lang: string }>();
+  const filteredStories = useMemo(() => {
+    if (!lang) return [];
+    return allStories.filter(story => story.language === lang);
+  }, [lang]);
 
   const handleSelectStory = (storyId: string) => {
     router.push({
@@ -15,7 +19,6 @@ export default function StoryList() {
       params: { storyId: storyId },
     });
   };
-
   // Colorful gradient backgrounds for cards
   const cardColors = [
     ['#FF6B9D', '#FEC163'],
@@ -29,10 +32,9 @@ export default function StoryList() {
   const getCardColor = (index: number) => {
     return cardColors[index % cardColors.length];
   };
-
+  const headerTitle = lang === 'hi' ? 'एक कहानी चुनें' : 'Story Time!';
   return (
     <View style={styles.container}>
-      {/* Decorative elements */}
       <View style={styles.starContainer}>
         <Text style={styles.star}>⭐</Text>
         <Text style={[styles.star, styles.star2]}>✨</Text>
@@ -41,29 +43,25 @@ export default function StoryList() {
 
       <View style={styles.headerContainer}>
         <Text style={styles.emoji}>📚</Text>
-        <Text style={styles.header}>Story Time!</Text>
+        <Text style={styles.header}>{headerTitle}</Text>
         <Text style={styles.subHeader}>Pick your favorite adventure</Text>
       </View>
 
       <FlatList
-        data={allStories}
+        data={filteredStories}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         renderItem={({ item, index }) => {
-          const [color1, color2] = getCardColor(index);
+          const [color1] = getCardColor(index);
           return (
             <TouchableOpacity
-              style={[styles.storyCard, {
-                backgroundColor: color1,
-              }]}
+              style={[styles.storyCard, { backgroundColor: color1 }]}
               onPress={() => handleSelectStory(item.id)}
               activeOpacity={0.8}
             >
               <View style={styles.cardContent}>
-                <View style={styles.iconCircle}>
-                  <Text style={styles.bookIcon}>📖</Text>
-                </View>
+                <View style={styles.iconCircle}><Text style={styles.bookIcon}>📖</Text></View>
                 <View style={styles.textContainer}>
                   <Text style={styles.storyTitle}>{item.title}</Text>
                   <View style={styles.playButton}>
@@ -72,7 +70,6 @@ export default function StoryList() {
                   </View>
                 </View>
               </View>
-              {/* Decorative dots */}
               <View style={styles.dotsContainer}>
                 <View style={[styles.dot, { backgroundColor: 'rgba(255,255,255,0.3)' }]} />
                 <View style={[styles.dot, { backgroundColor: 'rgba(255,255,255,0.3)' }]} />
@@ -81,6 +78,9 @@ export default function StoryList() {
             </TouchableOpacity>
           );
         }}
+        ListEmptyComponent={
+            <Text style={styles.emptyText}>No stories found for this language.</Text>
+        }
       />
     </View>
   );
@@ -214,4 +214,9 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
   },
+  emptyText: { 
+    textAlign: 'center',
+    marginTop: 50, 
+    color: '#6B7280', 
+    fontSize: 16 },
 });

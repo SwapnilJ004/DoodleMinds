@@ -4,6 +4,7 @@ export const storyData3: Story = {
   id: 'the-wind-and-the-sun',
   title: 'The Wind and the Sun',
   video: require('../assets/story3.mp4'),
+  language: 'en',
   interactionPoints: [
     {
       timestamp: 20000,

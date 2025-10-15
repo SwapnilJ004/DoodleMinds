@@ -1,9 +1,7 @@
-import React, { useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Animatable from 'react-native-animatable';
-import { useAudioPlayer } from 'expo-audio';
-import audioSource from '../../assets/BackgroundMusic.mp3';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -37,133 +35,48 @@ export default function LandingPage() {
   return (
     <View style={styles.container}>
       {/* Floating Stars Background Elements */}
-      <Animatable.Text
-        animation="pulse"
-        iterationCount="infinite"
-        duration={2000}
-        style={[styles.floatingIcon, { top: 50, left: 30 }]}
-      >
-        ⭐
-      </Animatable.Text>
-      <Animatable.Text
-        animation="pulse"
-        iterationCount="infinite"
-        duration={2500}
-        delay={500}
-        style={[styles.floatingIcon, { top: 100, right: 40 }]}
-      >
-        🌟
-      </Animatable.Text>
-      <Animatable.Text
-        animation="pulse"
-        iterationCount="infinite"
-        duration={3000}
-        delay={1000}
-        style={[styles.floatingIcon, { bottom: 150, left: 50 }]}
-      >
-        ✨
-      </Animatable.Text>
-      <Animatable.Text
-        animation="pulse"
-        iterationCount="infinite"
-        duration={2200}
-        delay={800}
-        style={[styles.floatingIcon, { bottom: 200, right: 60 }]}
-      >
-        💫
-      </Animatable.Text>
+      <Animatable.Text animation="pulse" iterationCount="infinite" duration={2000} style={[styles.floatingIcon, { top: 50, left: 30 }]}>⭐</Animatable.Text>
+      <Animatable.Text animation="pulse" iterationCount="infinite" duration={2500} delay={500} style={[styles.floatingIcon, { top: 100, right: 40 }]}>🌟</Animatable.Text>
+      <Animatable.Text animation="pulse" iterationCount="infinite" duration={3000} delay={1000} style={[styles.floatingIcon, { bottom: 150, left: 50 }]}>✨</Animatable.Text>
+      <Animatable.Text animation="pulse" iterationCount="infinite" duration={2200} delay={800} style={[styles.floatingIcon, { bottom: 200, right: 60 }]}>💫</Animatable.Text>
 
       {/* Main Content Container */}
       <View style={styles.contentContainer}>
-        <Animatable.Text
-          animation="fadeInDown"
-          duration={1500}
-          style={styles.title}
-        >
+        <Animatable.Text animation="fadeInDown" duration={1500} style={styles.title}>
           Welcome to
         </Animatable.Text>
 
-        <Animatable.View
-          animation="bounceIn"
-          duration={1500}
-          style={styles.appNameContainer}
-        >
+        <Animatable.View animation="bounceIn" duration={1500} style={styles.appNameContainer}>
           <Text style={styles.appName}>Doodle Minds</Text>
-          <Animatable.Text
-            animation="rotate"
-            iterationCount="infinite"
-            duration={3000}
-            style={styles.emoji}
-          >
-            🎨
-          </Animatable.Text>
+          <Animatable.Text animation="rotate" iterationCount="infinite" duration={3000} style={styles.emoji}>🎨</Animatable.Text>
         </Animatable.View>
 
-        <Animatable.View
-          animation="tada"
-          delay={1000}
-          duration={1500}
-          style={styles.badge}
-        >
+        <Animatable.View animation="tada" delay={1000} duration={1500} style={styles.badge}>
           <Text style={styles.badgeText}>Adventure Awaits! 🚀</Text>
         </Animatable.View>
 
-        <Animatable.Text
-          animation="fadeInUp"
-          delay={800}
-          duration={1500}
-          style={styles.subtitle}
-        >
+        <Animatable.Text animation="fadeInUp" delay={800} duration={1500} style={styles.subtitle}>
           Let your imagination guide the story!
         </Animatable.Text>
 
-        <Animatable.View animation="bounceIn" delay={1500} duration={1200}>
-          <TouchableOpacity
-            style={styles.playButton}
-            // Corrected navigation to the story list screen
-            onPress={() => router.push("/(tabs)/storyList")}
-            activeOpacity={0.8}
-          >
-            <View style={styles.buttonContent}>
-              <Text style={styles.playIcon}>▶</Text>
-              <Text style={styles.playButtonText}>Start Adventure!</Text>
-            </View>
-          </TouchableOpacity>
-        </Animatable.View>
+        <Animatable.View animation="bounceIn" delay={1500} duration={1200} style={styles.buttonContainer}>
+            <TouchableOpacity
+                style={[styles.languageButton, styles.englishButton]}
+                onPress={() => router.push({ pathname: '/(tabs)/storyList', params: { lang: 'en' } })}
+                activeOpacity={0.8}
+            >
+                <Text style={styles.languageButtonText}>English Stories</Text>
+            </TouchableOpacity>
 
-        <Animatable.View
-          animation="slideInUp"
-          delay={2000}
-          duration={1500}
-          style={styles.charactersContainer}
-        >
-          <Animatable.Text
-            animation="bounce"
-            iterationCount="infinite"
-            duration={2000}
-            style={styles.character}
-          >
-            🦄
-          </Animatable.Text>
-          <Animatable.Text
-            animation="bounce"
-            iterationCount="infinite"
-            duration={2000}
-            delay={300}
-            style={styles.character}
-          >
-            🎈
-          </Animatable.Text>
-          <Animatable.Text
-            animation="bounce"
-            iterationCount="infinite"
-            duration={2000}
-            delay={600}
-            style={styles.character}
-          >
-            🌈
-          </Animatable.Text>
+            <TouchableOpacity
+                style={[styles.languageButton, styles.hindiButton]}
+                onPress={() => router.push({ pathname: '/(tabs)/storyList', params: { lang: 'hi' } })}
+                activeOpacity={0.8}
+            >
+                <Text style={styles.languageButtonText}>हिन्दी कहानियाँ</Text>
+            </TouchableOpacity>
         </Animatable.View>
+        
       </View>
     </View>
   );
@@ -251,4 +164,33 @@ const styles = StyleSheet.create({
   },
   charactersContainer: { flexDirection: "row", marginTop: 50, gap: 20 },
   character: { fontSize: 40 },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+  },
+  languageButton: {
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 30,
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 3,
+    borderColor: '#FFF',
+  },
+  englishButton: {
+    backgroundColor: '#10B981',
+    shadowColor: '#10B981',
+  },
+  hindiButton: {
+    backgroundColor: '#8B5CF6',
+    shadowColor: '#8B5CF6',
+  },
+  languageButtonText: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '700',
+  },
 });

@@ -4,6 +4,7 @@ export const storyData4: Story = {
   id: 'tuta-ghada',
   title: 'The Broken Pot (Tuta Ghada)',
   video: require('../assets/story4.mp4'),
+  language: 'hi',
   interactionPoints: [
     {
       timestamp: 18000,

@@ -1,403 +1,271 @@
-// app/(tabs)/scribble.tsx
-import React, { useState, useRef, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  ScrollView,
-  Modal,
-  Animated,
-} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import Svg, { Path } from 'react-native-svg';
+import { off, onDisconnect, onValue, push, ref, set, update } from 'firebase/database';
+import { useEffect, useRef, useState } from 'react';
+import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as Animatable from 'react-native-animatable';
-import { useAudioPlayer } from 'expo-audio';
-import audioSource from '../../assets/BackgroundMusic.mp3';
+import Svg, { Path } from 'react-native-svg';
+import { database } from '../../firebaseConfig';
 
-// Word list for the game
-const WORD_LIST = [
-  '🐱 Cat', '🐶 Dog', '🌳 Tree', '🏠 House', '⭐ Star', 
-  '🌞 Sun', '🌙 Moon', '🚗 Car', '✈️ Plane', '🚂 Train',
-  '🍎 Apple', '🍌 Banana', '🌸 Flower', '☁️ Cloud', '🌈 Rainbow',
-  '🎈 Balloon', '⚽ Ball', '🎂 Cake', '🎁 Gift', '👑 Crown'
-];
+// --- Constants ---
+const WORD_LIST = ['🐱 Cat', '🐶 Dog', '🌳 Tree', '🏠 House', '⭐ Star', '🌞 Sun', '🌙 Moon', '🚗 Car', '✈️ Plane', '🚂 Train', '🍎 Apple', '🍌 Banana', '🌸 Flower', '☁️ Cloud', '🌈 Rainbow', '🎈 Balloon', '⚽ Ball', '🎂 Cake', '🎁 Gift', '👑 Crown'];
+const COLORS = [{ name: 'black', color: '#000000' }, { name: 'red', color: '#FF6B6B' }, { name: 'blue', color: '#4ECDC4' }, { name: 'green', color: '#95E1D3' }, { name: 'yellow', color: '#FFE66D' }, { name: 'purple', color: '#C792EA' }, { name: 'orange', color: '#FF8B4D' }, { name: 'pink', color: '#FF9CEE' }];
 
-const COLORS = [
-  { name: 'black', color: '#000000' },
-  { name: 'red', color: '#FF6B6B' },
-  { name: 'blue', color: '#4ECDC4' },
-  { name: 'green', color: '#95E1D3' },
-  { name: 'yellow', color: '#FFE66D' },
-  { name: 'purple', color: '#C792EA' },
-  { name: 'orange', color: '#FF8B4D' },
-  { name: 'pink', color: '#FF9CEE' },
-];
-
-type Player = {
-  id: string;
-  name: string;
-  score: number;
-  hasGuessed: boolean;
-};
-
+// --- Types ---
+type Player = { id: string; name: string; score: number; hasGuessed: boolean; };
 type GameState = 'lobby' | 'drawing' | 'guessing' | 'reveal' | 'gameover';
+type DrawingPath = { path: string; color: string; strokeWidth: number };
 
+// --- Main Game Component ---
 export default function ScribbleGame() {
   const router = useRouter();
   
-  // Game state
-  const [gameState, setGameState] = useState<GameState>('lobby');
-  const [players, setPlayers] = useState<Player[]>([]);
+  // Local state (unique to this device)
+  const [currentPlayerId] = useState(`player_${Math.random().toString(36).substr(2, 9)}`);
   const [currentPlayerName, setCurrentPlayerName] = useState('');
+  const [roomId, setRoomId] = useState<string | null>(null);
+  const [joinRoomId, setJoinRoomId] = useState('');
+  
+  // Synced game state (from Firebase)
+  const [gameState, setGameState] = useState<GameState>('lobby');
+  const [players, setPlayers] = useState<Record<string, Player>>({});
   const [currentDrawer, setCurrentDrawer] = useState<string | null>(null);
   const [currentWord, setCurrentWord] = useState('');
   const [timeLeft, setTimeLeft] = useState(60);
   const [round, setRound] = useState(1);
-  const [guessInput, setGuessInput] = useState('');
   const [chatMessages, setChatMessages] = useState<Array<{player: string, message: string, isCorrect?: boolean}>>([]);
+  const [paths, setPaths] = useState<DrawingPath[]>([]);
+  
+  // Local UI state
+  const [guessInput, setGuessInput] = useState('');
   const [showWordModal, setShowWordModal] = useState(false);
   const [wordChoices, setWordChoices] = useState<string[]>([]);
-  
-  // Drawing state
-  const [paths, setPaths] = useState<string[]>([]);
   const [currentColor, setCurrentColor] = useState('#000000');
   const [brushSize, setBrushSize] = useState(4);
   const currentPath = useRef<string>('');
-  
-  // Timer
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [currentPlayerId, setCurrentPlayerId] = useState('');
-  const player = useAudioPlayer(audioSource);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Generate random player ID on mount
+  // --- Hooks and Functions ---
+
   useEffect(() => {
-    setCurrentPlayerId(`player_${Math.random().toString(36).substr(2, 9)}`);
+    const loadPlayerName = async () => {
+      const storedName = await AsyncStorage.getItem('playerName');
+      if (storedName) setCurrentPlayerName(storedName);
+    };
+    loadPlayerName();
   }, []);
 
-  // Timer logic
   useEffect(() => {
-    if (gameState === 'drawing' || gameState === 'guessing') {
-      timerRef.current = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            handleTimeUp();
-            return 0;
+    if (!roomId) return;
+    const roomRef = ref(database, `rooms/${roomId}`);
+    const unsubscribe = onValue(roomRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setGameState(data.gameState || 'lobby');
+        setPlayers(data.players || {});
+        setCurrentDrawer(data.currentDrawer || null);
+        setCurrentWord(data.currentWord || '');
+        setTimeLeft(data.timeLeft !== undefined ? data.timeLeft : 60);
+        setRound(data.round || 1);
+        setChatMessages(data.chatMessages ? Object.values(data.chatMessages) : []);
+        setPaths(data.paths ? Object.values(data.paths) : []);
+      } else {
+        alert("Room not found or has been closed.");
+        setRoomId(null);
+      }
+    });
+    return () => off(roomRef, 'value', unsubscribe);
+  }, [roomId]);
+
+  useEffect(() => {
+    if ((gameState === 'drawing' || gameState === 'guessing') && timeLeft > 0) {
+      const playersArray = Object.values(players);
+      if (playersArray.length > 0 && playersArray[0].id === currentPlayerId) {
+        timerRef.current = setTimeout(() => {
+          if (roomId) {
+            const newTime = timeLeft - 1;
+            const roomRef = ref(database, `rooms/${roomId}`);
+            if (newTime <= 0) {
+              update(roomRef, { gameState: 'reveal' });
+            } else {
+              update(roomRef, { timeLeft: newTime });
+            }
           }
-          return prev - 1;
-        });
-      }, 1000);
+        }, 1000);
+      }
     }
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [gameState]);
+  }, [gameState, timeLeft, players, currentPlayerId, roomId]);
 
-  const handleJoinGame = () => {
-    player.pause();
-    if (currentPlayerName.trim()) {
-      const newPlayer: Player = {
-        id: currentPlayerId,
-        name: currentPlayerName.trim(),
-        score: 0,
-        hasGuessed: false,
-      };
-      setPlayers([...players, newPlayer]);
-      setCurrentPlayerName('');
-    }
+  const handleCreateGame = async () => {
+    if (!currentPlayerName.trim()) return alert('Please enter your name!');
+    await AsyncStorage.setItem('playerName', currentPlayerName.trim());
+    const newRoomId = Math.random().toString(36).substring(2, 6).toUpperCase();
+    await set(ref(database, `rooms/${newRoomId}`), { gameState: 'lobby', players: {}, round: 1 });
+    joinGame(newRoomId);
   };
 
-  const handleStartGame = (player) => {
-    if (players.length < 2) {
-      alert('Need at least 2 players to start!');
-      return;
-    }
-    player.pause();
+  const handleJoinExistingGame = async () => {
+    if (!currentPlayerName.trim()) return alert('Please enter your name!');
+    if (!joinRoomId.trim()) return alert('Please enter a room code!');
+    await AsyncStorage.setItem('playerName', currentPlayerName.trim());
+    joinGame(joinRoomId.toUpperCase());
+  };
+
+  const joinGame = (targetRoomId: string) => {
+    setRoomId(targetRoomId);
+    const playerRef = ref(database, `rooms/${targetRoomId}/players/${currentPlayerId}`);
+    set(playerRef, { id: currentPlayerId, name: currentPlayerName.trim(), score: 0, hasGuessed: false });
+    onDisconnect(playerRef).remove();
+  };
+
+  const handleStartGame = () => {
+    if (!roomId) return;
+    if (Object.values(players).length < 2) return alert('Need at least 2 players to start!');
     startNewRound();
   };
 
   const startNewRound = () => {
-    // Select random drawer
-    const drawerIndex = (round - 1) % players.length;
-    setCurrentDrawer(players[drawerIndex].id);
+    if (!roomId) return;
+    const playersArray = Object.values(players);
+    const drawerIndex = (round - 1) % playersArray.length;
+    const newDrawer = playersArray[drawerIndex].id;
     
-    // Reset player guessed status
-    setPlayers(prev => prev.map(p => ({ ...p, hasGuessed: false })));
+    const updatedPlayers: Record<string, Player> = {};
+    playersArray.forEach(p => { updatedPlayers[p.id] = {...p, hasGuessed: false }; });
     
-    // If current player is drawer, show word choices
-    if (players[drawerIndex].id === currentPlayerId) {
-      const choices = getRandomWords(3);
-      setWordChoices(choices);
+    if (newDrawer === currentPlayerId) {
+      setWordChoices(getRandomWords(3));
       setShowWordModal(true);
-    } else {
-      setGameState('guessing');
-      setTimeLeft(60);
     }
     
-    setPaths([]);
-    setChatMessages([]);
-    setGuessInput('');
+    update(ref(database, `rooms/${roomId}`), {
+      currentDrawer: newDrawer, gameState: 'guessing', timeLeft: 60,
+      paths: null, chatMessages: null, players: updatedPlayers, currentWord: '',
+    });
   };
-
+  
   const getRandomWords = (count: number): string[] => {
     const shuffled = [...WORD_LIST].sort(() => 0.5 - Math.random());
     return shuffled.slice(0, count);
   };
 
   const handleWordChoice = (word: string) => {
-    setCurrentWord(word);
+    if (roomId) update(ref(database, `rooms/${roomId}`), { currentWord: word, gameState: 'drawing' });
     setShowWordModal(false);
-    setGameState('drawing');
-    setTimeLeft(60);
-  };
-
-  const handleTimeUp = () => {
-    setGameState('reveal');
-    setTimeout(() => {
-      if (round >= players.length) {
-        setGameState('gameover');
-      } else {
-        setRound(prev => prev + 1);
-        startNewRound();
-      }
-    }, 5000);
   };
 
   const handleGuess = () => {
-    if (!guessInput.trim()) return;
+    if (!guessInput.trim() || !roomId || players[currentPlayerId]?.hasGuessed) return;
+    const isCorrect = guessInput.toLowerCase().trim() === currentWord.split(' ')[1]?.toLowerCase();
     
-    const isCorrect = guessInput.toLowerCase().trim() === currentWord.split(' ')[1].toLowerCase();
-    
-    const player = players.find(p => p.id === currentPlayerId);
-    if (!player || player.hasGuessed) return;
-
-    setChatMessages(prev => [
-      ...prev,
-      { player: player.name, message: guessInput, isCorrect }
-    ]);
+    push(ref(database, `rooms/${roomId}/chatMessages`), { player: currentPlayerName, message: guessInput, isCorrect });
 
     if (isCorrect) {
-      // Award points
       const pointsEarned = Math.max(100 - (60 - timeLeft) * 2, 20);
-      setPlayers(prev => prev.map(p => 
-        p.id === currentPlayerId 
-          ? { ...p, score: p.score + pointsEarned, hasGuessed: true }
-          : p
-      ));
-      
-      // Check if all players have guessed
-      const allGuessed = players.filter(p => p.id !== currentDrawer).every(p => 
-        p.hasGuessed || p.id === currentPlayerId
-      );
-      
-      if (allGuessed) {
-        handleTimeUp();
-      }
-    } else {
-      setPlayers(prev => prev.map(p => 
-        p.id === currentPlayerId ? { ...p, hasGuessed: true } : p
-      ));
+      const playerRef = ref(database, `rooms/${roomId}/players/${currentPlayerId}`);
+      update(playerRef, { score: (players[currentPlayerId].score || 0) + pointsEarned, hasGuessed: true });
     }
-
     setGuessInput('');
   };
 
-  // Drawing functions
   const handleDrawingStart = (event: any) => {
     if (currentDrawer !== currentPlayerId) return;
     const { locationX, locationY } = event.nativeEvent;
     currentPath.current = `M${locationX.toFixed(0)},${locationY.toFixed(0)}`;
-    setPaths(prev => [...prev, currentPath.current]);
   };
 
   const handleDrawingMove = (event: any) => {
     if (currentDrawer !== currentPlayerId) return;
     const { locationX, locationY } = event.nativeEvent;
-    const newPoint = ` L${locationX.toFixed(0)},${locationY.toFixed(0)}`;
-    currentPath.current += newPoint;
-    setPaths(prev => [...prev.slice(0, -1), currentPath.current]);
+    currentPath.current += ` L${locationX.toFixed(0)},${locationY.toFixed(0)}`;
+  };
+
+  const handleDrawingEnd = () => {
+    if (currentDrawer !== currentPlayerId || !roomId || !currentPath.current) return;
+    const newPath = { path: currentPath.current, color: currentColor, strokeWidth: brushSize };
+    push(ref(database, `rooms/${roomId}/paths`), newPath);
+    currentPath.current = '';
   };
 
   const clearCanvas = () => {
-    setPaths([]);
+    if (roomId) update(ref(database, `rooms/${roomId}`), { paths: null });
   };
 
-  // Render functions
-  const renderLobby = (audioPlayer) => (
+  // --- Render Functions ---
+
+  const renderInitialScreen = () => (
     <View style={styles.lobbyContainer}>
-      <Animatable.Text animation="bounceIn" style={styles.gameTitle}>
-        🎨 Scribble Guess! 🎨
-      </Animatable.Text>
-      
+      <Animatable.Text animation="bounceIn" style={styles.gameTitle}>🎨 Scribble Guess! 🎨</Animatable.Text>
       <View style={styles.joinSection}>
-        <TextInput
-          style={styles.nameInput}
-          placeholder="Enter your name"
-          value={currentPlayerName}
-          onChangeText={setCurrentPlayerName}
-          maxLength={15}
-        />
-        <TouchableOpacity style={styles.joinButton} onPress={handleJoinGame}>
-          <Text style={styles.joinButtonText}>Join Game</Text>
-        </TouchableOpacity>
+        <TextInput style={styles.nameInput} placeholder="Enter your name" value={currentPlayerName} onChangeText={setCurrentPlayerName} maxLength={15} />
+        <TouchableOpacity style={styles.joinButton} onPress={handleCreateGame}><Text style={styles.joinButtonText}>Create Game</Text></TouchableOpacity>
+        <Text style={styles.orText}>OR</Text>
+        <TextInput style={styles.nameInput} placeholder="Enter room code" value={joinRoomId} onChangeText={setJoinRoomId} maxLength={4} autoCapitalize="characters" />
+        <TouchableOpacity style={[styles.joinButton, styles.joinExistingButton]} onPress={handleJoinExistingGame}><Text style={styles.joinButtonText}>Join Game</Text></TouchableOpacity>
       </View>
-
-      <View style={styles.playersListContainer}>
-        <Text style={styles.playersTitle}>Players ({players.length})</Text>
-        <ScrollView style={styles.playersList}>
-          {players.map((player, index) => (
-            <Animatable.View
-              key={player.id}
-              animation="fadeInRight"
-              delay={index * 100}
-              style={styles.playerCard}
-            >
-              <Text style={styles.playerEmoji}>👤</Text>
-              <Text style={styles.playerName}>{player.name}</Text>
-            </Animatable.View>
-          ))}
-        </ScrollView>
-      </View>
-
-      {players.length >= 2 && (
-        <Animatable.View animation="pulse" iterationCount="infinite">
-          <TouchableOpacity style={styles.startButton} onPress={()=> handleStartGame(audioPlayer)}>
-            <Text style={styles.startButtonText}>🎮 Start Game!</Text>
-          </TouchableOpacity>
-        </Animatable.View>
-      )}
-
-      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-        <Text style={styles.backButtonText}>← Back</Text>
-      </TouchableOpacity>
+      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}><Text style={styles.backButtonText}>← Back</Text></TouchableOpacity>
     </View>
   );
 
-  const renderDrawing = () => {
-    const isDrawer = currentDrawer === currentPlayerId;
-    const drawerName = players.find(p => p.id === currentDrawer)?.name || 'Someone';
-
+  const renderLobby = () => {
+    const playersArray = Object.values(players);
     return (
-      <View style={styles.gameContainer}>
-        {/* Header */}
-        <View style={styles.gameHeader}>
-          <View style={styles.timerContainer}>
-            <Text style={styles.timerText}>⏱️ {timeLeft}s</Text>
-          </View>
-          <View style={styles.roundContainer}>
-            <Text style={styles.roundText}>Round {round}/{players.length}</Text>
-          </View>
-        </View>
-
-        {/* Word display */}
-        <View style={styles.wordContainer}>
-          {isDrawer ? (
-            <Text style={styles.wordText}>Draw: {currentWord}</Text>
-          ) : (
-            <Text style={styles.wordHint}>
-              {drawerName} is drawing... Guess the word!
-            </Text>
-          )}
-        </View>
-
-        {/* Canvas */}
-        <View style={styles.canvasContainer}>
-          <View
-            style={styles.canvas}
-            onStartShouldSetResponder={() => isDrawer}
-            onResponderGrant={handleDrawingStart}
-            onResponderMove={handleDrawingMove}
-          >
-            <Svg height="100%" width="100%" viewBox="0 0 350 350">
-              {paths.map((path, idx) => (
-                <Path
-                  key={idx}
-                  d={path}
-                  stroke={currentColor}
-                  strokeWidth={brushSize}
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              ))}
-            </Svg>
-          </View>
-
-          {isDrawer && (
-            <View style={styles.drawingTools}>
-              <View style={styles.colorPalette}>
-                {COLORS.map(({ color }) => (
-                  <TouchableOpacity
-                    key={color}
-                    style={[
-                      styles.colorButton,
-                      { backgroundColor: color },
-                      currentColor === color && styles.selectedColor,
-                    ]}
-                    onPress={() => setCurrentColor(color)}
-                  />
-                ))}
-              </View>
-              <TouchableOpacity style={styles.clearButton} onPress={clearCanvas}>
-                <Text style={styles.clearButtonText}>🗑️ Clear</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-
-        {/* Guess input */}
-        {!isDrawer && (
-          <View style={styles.guessContainer}>
-            <TextInput
-              style={styles.guessInput}
-              placeholder="Type your guess..."
-              value={guessInput}
-              onChangeText={setGuessInput}
-              onSubmitEditing={handleGuess}
-              editable={!players.find(p => p.id === currentPlayerId)?.hasGuessed}
-            />
-            <TouchableOpacity 
-              style={styles.guessButton} 
-              onPress={handleGuess}
-              disabled={players.find(p => p.id === currentPlayerId)?.hasGuessed}
-            >
-              <Text style={styles.guessButtonText}>Send</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Chat/Guesses */}
-        <View style={styles.chatContainer}>
-          <ScrollView style={styles.chatScroll}>
-            {chatMessages.map((msg, idx) => (
-              <View
-                key={idx}
-                style={[
-                  styles.chatMessage,
-                  msg.isCorrect && styles.correctGuess,
-                ]}
-              >
-                <Text style={styles.chatPlayer}>{msg.player}: </Text>
-                <Text style={styles.chatText}>
-                  {msg.isCorrect ? '✅ Got it!' : msg.message}
-                </Text>
-              </View>
-            ))}
+      <View style={styles.lobbyContainer}>
+        <Text style={styles.roomCode}>Room Code: {roomId}</Text>
+        <View style={styles.playersListContainer}>
+          <Text style={styles.playersTitle}>Players ({playersArray.length})</Text>
+          <ScrollView>
+            {playersArray.map((player) => (<Animatable.View key={player.id} animation="fadeInRight" style={styles.playerCard}><Text style={styles.playerName}>{player.name}</Text></Animatable.View>))}
           </ScrollView>
         </View>
+        {playersArray.length >= 2 && (<Animatable.View animation="pulse" iterationCount="infinite"><TouchableOpacity style={styles.startButton} onPress={handleStartGame}><Text style={styles.startButtonText}>🎮 Start Game!</Text></TouchableOpacity></Animatable.View>)}
+        <TouchableOpacity style={styles.backButton} onPress={() => setRoomId(null)}><Text style={styles.backButtonText}>← Leave Room</Text></TouchableOpacity>
+      </View>
+    );
+  };
 
-        {/* Scoreboard */}
-        <View style={styles.miniScoreboard}>
-          {players.map(player => (
-            <View key={player.id} style={styles.miniScoreItem}>
-              <Text style={styles.miniScoreName}>
-                {player.id === currentDrawer ? '✏️ ' : ''}
-                {player.name}
-              </Text>
-              <Text style={styles.miniScorePoints}>{player.score}pts</Text>
+  const renderDrawing = () => {
+    const isDrawer = currentDrawer === currentPlayerId;
+    const drawerName = players[currentDrawer || '']?.name || 'Someone';
+    return (
+      <View style={styles.gameContainer}>
+        <View style={styles.gameHeader}>
+          <View style={styles.timerContainer}><Text style={styles.timerText}>⏱️ {timeLeft}s</Text></View>
+          <View style={styles.roundContainer}><Text style={styles.roundText}>Round {round}/{Object.keys(players).length}</Text></View>
+        </View>
+        <View style={styles.wordContainer}>
+          {isDrawer ? <Text style={styles.wordText}>Draw: {currentWord}</Text> : <Text style={styles.wordHint}>{drawerName} is drawing...</Text>}
+        </View>
+        <View style={styles.canvas} onStartShouldSetResponder={() => true} onResponderGrant={handleDrawingStart} onResponderMove={handleDrawingMove} onResponderRelease={handleDrawingEnd}>
+          <Svg height="100%" width="100%">{paths.map((item, index) => (<Path key={index} d={item.path} stroke={item.color} strokeWidth={item.strokeWidth} fill="none" strokeLinecap="round" strokeLinejoin="round" />))}</Svg>
+        </View>
+        <View style={styles.bottomSection}>
+          {isDrawer ? (
+            <View style={styles.drawingTools}>
+              <View style={styles.colorPalette}>{COLORS.map(({ color }) => (<TouchableOpacity key={color} style={[styles.colorButton, { backgroundColor: color }, currentColor === color && styles.selectedColor]} onPress={() => setCurrentColor(color)} />))}</View>
+              <TouchableOpacity style={styles.clearButton} onPress={clearCanvas}><Text style={styles.clearButtonText}>🗑️</Text></TouchableOpacity>
             </View>
-          ))}
+          ) : (
+            <View>
+              <View style={styles.chatContainer}>
+                <ScrollView>
+                  {chatMessages.map((msg, idx) => (
+                    <View key={idx} style={[styles.chatMessage, msg.isCorrect && styles.correctGuess]}>
+                      <Text style={styles.chatPlayer}>{msg.player}: </Text>
+                      <Text>{msg.isCorrect ? '✅ Got it!' : msg.message}</Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+              <View style={styles.guessContainer}>
+                <TextInput style={styles.guessInput} placeholder="Type your guess..." value={guessInput} onChangeText={setGuessInput} onSubmitEditing={handleGuess} editable={!players[currentPlayerId]?.hasGuessed} />
+                <TouchableOpacity style={styles.guessButton} onPress={handleGuess} disabled={players[currentPlayerId]?.hasGuessed}><Text style={styles.guessButtonText}>Send</Text></TouchableOpacity>
+              </View>
+            </View>
+          )}
         </View>
       </View>
     );
@@ -405,86 +273,48 @@ export default function ScribbleGame() {
 
   const renderReveal = () => (
     <View style={styles.revealContainer}>
-      <Animatable.Text animation="bounceIn" style={styles.revealTitle}>
-        The word was:
-      </Animatable.Text>
-      <Animatable.Text animation="zoomIn" delay={300} style={styles.revealWord}>
-        {currentWord}
-      </Animatable.Text>
-      <Text style={styles.nextRoundText}>
-        {round >= players.length ? 'Final Scores!' : 'Next round starting...'}
-      </Text>
+      <Animatable.Text animation="bounceIn" style={styles.revealTitle}>The word was:</Animatable.Text>
+      <Animatable.Text animation="zoomIn" delay={300} style={styles.revealWord}>{currentWord}</Animatable.Text>
     </View>
   );
 
   const renderGameOver = () => {
-    const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
+    const sortedPlayers = Object.values(players).sort((a, b) => b.score - a.score);
     const winner = sortedPlayers[0];
-
     return (
       <View style={styles.gameOverContainer}>
-        <Animatable.Text animation="bounceIn" style={styles.gameOverTitle}>
-          🎉 Game Over! 🎉
-        </Animatable.Text>
-        
-        <Animatable.View animation="tada" delay={500} style={styles.winnerCard}>
-          <Text style={styles.winnerEmoji}>👑</Text>
-          <Text style={styles.winnerText}>Winner!</Text>
-          <Text style={styles.winnerName}>{winner.name}</Text>
-          <Text style={styles.winnerScore}>{winner.score} points</Text>
-        </Animatable.View>
-
+        <Animatable.Text animation="bounceIn" style={styles.gameOverTitle}>🎉 Game Over! 🎉</Animatable.Text>
+        {winner && <Animatable.View animation="tada" delay={500} style={styles.winnerCard}><Text style={styles.winnerEmoji}>👑</Text><Text style={styles.winnerText}>Winner!</Text><Text style={styles.winnerName}>{winner.name}</Text><Text style={styles.winnerScore}>{winner.score} points</Text></Animatable.View>}
         <View style={styles.finalScoreboard}>
           <Text style={styles.finalScoreTitle}>Final Scores</Text>
           {sortedPlayers.map((player, index) => (
-            <Animatable.View
-              key={player.id}
-              animation="fadeInUp"
-              delay={index * 150}
-              style={styles.finalScoreItem}
-            >
-              <Text style={styles.finalScoreRank}>#{index + 1}</Text>
-              <Text style={styles.finalScoreName}>{player.name}</Text>
-              <Text style={styles.finalScorePoints}>{player.score}</Text>
-            </Animatable.View>
+            <Animatable.View key={player.id} animation="fadeInUp" delay={index * 150} style={styles.finalScoreItem}><Text style={styles.finalScoreRank}>#{index + 1}</Text><Text style={styles.finalScoreName}>{player.name}</Text><Text style={styles.finalScorePoints}>{player.score} pts</Text></Animatable.View>
           ))}
         </View>
-
-        <TouchableOpacity
-          style={styles.playAgainButton}
-          onPress={() => {
-            setGameState('lobby');
-            setPlayers([]);
-            setRound(1);
-          }}
-        >
-          <Text style={styles.playAgainText}>🔄 Play Again</Text>
-        </TouchableOpacity>
+        <TouchableOpacity style={styles.playAgainButton} onPress={() => setRoomId(null)}><Text style={styles.playAgainText}>🔄 Play Again</Text></TouchableOpacity>
       </View>
     );
+  };
+  
+  const renderContent = () => {
+    if (!roomId) return renderInitialScreen();
+    switch (gameState) {
+      case 'lobby': return renderLobby();
+      case 'drawing': case 'guessing': return renderDrawing();
+      case 'reveal': return renderReveal();
+      case 'gameover': return renderGameOver();
+      default: return <Text>Loading...</Text>;
+    }
   };
 
   return (
     <View style={styles.container}>
-      {gameState === 'lobby' && renderLobby(audioPlayer)}
-      {(gameState === 'drawing' || gameState === 'guessing') && renderDrawing()}
-      {gameState === 'reveal' && renderReveal()}
-      {gameState === 'gameover' && renderGameOver()}
-
-      {/* Word choice modal */}
+      {renderContent()}
       <Modal visible={showWordModal} transparent animationType="fade">
         <View style={styles.modalContainer}>
           <Animatable.View animation="zoomIn" style={styles.modalContent}>
             <Text style={styles.modalTitle}>Choose a word to draw!</Text>
-            {wordChoices.map((word, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.wordChoice}
-                onPress={() => handleWordChoice(word)}
-              >
-                <Text style={styles.wordChoiceText}>{word}</Text>
-              </TouchableOpacity>
-            ))}
+            {wordChoices.map((word) => (<TouchableOpacity key={word} style={styles.wordChoice} onPress={() => handleWordChoice(word)}><Text style={styles.wordChoiceText}>{word}</Text></TouchableOpacity>))}
           </Animatable.View>
         </View>
       </Modal>
@@ -509,6 +339,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 30,
   },
+  roomCode: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#8B5CF6',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
   joinSection: {
     marginBottom: 30,
   },
@@ -521,16 +358,29 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#BAE6FF',
   },
+  bottomSection: { 
+    marginTop: 10 
+  },
   joinButton: {
     backgroundColor: '#4ECDC4',
     padding: 15,
     borderRadius: 12,
     alignItems: 'center',
   },
+  joinExistingButton: {
+    backgroundColor: '#8B5CF6',
+  },
   joinButtonText: {
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  orText: {
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#6366F1',
+    marginVertical: 15,
   },
   playersListContainer: {
     backgroundColor: 'white',

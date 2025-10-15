@@ -17,6 +17,7 @@ export interface Story {
   id: string;
   title: string;
   video: any; 
+  language: 'en' | 'hi';
   interactionPoints: InteractionPoint[];
 }
 
@@ -24,6 +25,7 @@ export const storyData: Story = {
   id: 'Clever-Fish',
   title: 'Clever Fish',
   video: require('../assets/story1.mp4'),
+  language: 'en',
   interactionPoints: [
     {
       timestamp: 15000,
