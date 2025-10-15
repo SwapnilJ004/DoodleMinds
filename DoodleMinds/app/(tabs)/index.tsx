@@ -30,7 +30,9 @@ export default function Index() {
       }
     }
 
-    playBackgroundMusic();
+    setTimeout(() => {
+      playBackgroundMusic();
+    }, 1500)
 
     return () => {
       isActive = false;
@@ -63,11 +65,19 @@ export default function Index() {
     };
   }, []);
 
+
+  async function pauseBackgroundMusic() {
+    await backgroundSoundRef.current?.pauseAsync();
+  }
+  
   const handleAgeSelection = (ageGroup: 'young' | 'older') => {
+    pauseBackgroundMusic()
     if (ageGroup === 'young') {
-      router.push("/(tabs)/landing" as never);
+      router.push({
+        pathname: "/(tabs)/juniorPage",
+      });
     } else {
-      router.push("/(tabs)/scribble" as never);
+      router.push("/(tabs)/scribblePage" as never);
     }
   };
 

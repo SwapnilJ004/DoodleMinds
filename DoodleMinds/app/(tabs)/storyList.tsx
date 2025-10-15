@@ -11,34 +11,15 @@ export default function StoryList() {
     if (!lang) return [];
     return allStories.filter(story => story.language === lang);
   }, [lang]);
-
-  // Play background music on mount
-  const bgSoundRef = useRef<Audio.Sound | null>(null);
-
-  useEffect(() => {
-    let isActive = true;
-    async function loadBgMusic() {
-      if (!bgSoundRef.current) {
-        const { sound } = await Audio.Sound.createAsync(
-          require('../../assets/BackgroundMusic.mp3'),
-          { shouldPlay: true, isLooping: true }
-        );
-        bgSoundRef.current = sound;
-        if (isActive) {
-          await sound.playAsync();
-        }
-      }
-    }
-    loadBgMusic();
-    return () => {
-      isActive = false;
-      if (bgSoundRef.current) {
-        bgSoundRef.current.unloadAsync();
-      }
-    };
-  }, []);
+  const backgroundSoundRef = useRef<Audio.Sound | null>(null);
 
   const handleSelectStory = (storyId: string) => {
+    // Pause background music
+    async function pauseBackgroundMusic() {
+    }
+
+    pauseBackgroundMusic();
+
     router.push({
       pathname: '/(tabs)/juniorPlayback',
       params: { storyId: storyId },
