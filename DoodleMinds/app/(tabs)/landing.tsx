@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as Animatable from 'react-native-animatable';
 import { useAudioPlayer } from 'expo-audio';
 import audioSource from '../../assets/BackgroundMusic.mp3';
+import { Audio } from 'expo-av';
 
 export default function LandingPage() {
   const router = useRouter();

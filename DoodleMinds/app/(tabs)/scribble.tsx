@@ -108,7 +108,7 @@ export default function ScribbleGame() {
     }
   };
 
-  const handleStartGame = (player) => {
+  const handleStartGame = () => {
     if (players.length < 2) {
       alert('Need at least 2 players to start!');
       return;
@@ -224,7 +224,7 @@ export default function ScribbleGame() {
   };
 
   // Render functions
-  const renderLobby = (audioPlayer) => (
+  const renderLobby = () => (
     <View style={styles.lobbyContainer}>
       <Animatable.Text animation="bounceIn" style={styles.gameTitle}>
         🎨 Scribble Guess! 🎨
@@ -262,7 +262,7 @@ export default function ScribbleGame() {
 
       {players.length >= 2 && (
         <Animatable.View animation="pulse" iterationCount="infinite">
-          <TouchableOpacity style={styles.startButton} onPress={()=> handleStartGame(audioPlayer)}>
+          <TouchableOpacity style={styles.startButton} onPress={()=> handleStartGame()}>
             <Text style={styles.startButtonText}>🎮 Start Game!</Text>
           </TouchableOpacity>
         </Animatable.View>
@@ -466,7 +466,7 @@ export default function ScribbleGame() {
 
   return (
     <View style={styles.container}>
-      {gameState === 'lobby' && renderLobby(audioPlayer)}
+      {gameState === 'lobby' && renderLobby()}
       {(gameState === 'drawing' || gameState === 'guessing') && renderDrawing()}
       {gameState === 'reveal' && renderReveal()}
       {gameState === 'gameover' && renderGameOver()}
