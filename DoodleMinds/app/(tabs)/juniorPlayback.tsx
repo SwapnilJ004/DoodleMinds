@@ -1,10 +1,12 @@
 import { Image } from "react-native";
 import React, { useState, useRef, useEffect } from "react";
+import ViewShot from "react-native-view-shot";
+import * as FileSystem from "expo-file-system/legacy";
+import { Asset } from "expo-asset";
 import {
   StyleSheet,
   View,
   Text,
-  Button,
   Pressable,
   Modal,
   TouchableOpacity,
@@ -32,12 +34,11 @@ const DrawingInterface = ({
   interaction: InteractionPoint;
   onContinueStory: () => void;
 }) => {
+  const viewRef = useRef<ViewShot>(null);
   const [userPaths, setUserPaths] = useState<{
     [partId: string]: { path: string; color: string; strokeWidth: number }[];
   }>({});
-  const [fillColors, setFillColors] = useState<{ [partId: string]: string }>(
-    {}
-  );
+  const [fillColors, setFillColors] = useState<{ [partId: string]: string }>({});
   const [currentColor, setCurrentColor] = useState<string>(COLORS[0].color);
   const [selectedPartId, setSelectedPartId] = useState<string | null>(
     interaction.outlineParts.length > 0 ? interaction.outlineParts[0].id : null
@@ -87,17 +88,85 @@ const DrawingInterface = ({
     setFillColors((prev) => ({ ...prev, [partId]: currentColor }));
   };
 
-  const handleSubmit = () => {
-    setShowSuccessPopup(true);
-    Animated.spring(successScale, {
-      toValue: 1,
-      friction: 4,
-      useNativeDriver: true,
-    }).start();
-    setTimeout(() => {
-      setShowSuccessPopup(false);
-      onContinueStory();
-    }, 2000);
+  // Helper to get base64 of a static asset using expo-asset and expo-file-system
+  const getAssetBase64 = async (requireSource: string | number | { uri: string; width: number; height: number; }) => {
+    const asset = Asset.fromModule(requireSource);
+    await asset.downloadAsync();
+    // Use asset.localUri, or asset.uri if .localUri is undefined
+    const uri = asset.localUri || asset.uri;
+    return await FileSystem.readAsStringAsync(uri, { encoding: "base64" });
+  };
+
+  const handleSubmit = async () => {
+    if (viewRef.current && typeof viewRef.current.capture === "function") {
+      try {
+        // Capture drawing as base64 PNG
+        const drawingBase64 = await viewRef.current.capture();
+
+        // Get fish.png from your project assets as base64
+        const fishBase64 = await getAssetBase64(require("../../assets/fish.png"));
+
+        // Gemini API endpoint (2.5-flash, using your API key)
+        const geminiApiUrl =
+          "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyAay25hKjum5zo60sNKOMR-jgEiTsytq8I";
+
+        // Create payload for content generation
+        // For comparing two images, you can use the "contents" array with two "parts" of inline_data, and give the model a prompt as the first message part.
+        const body = {
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  text:
+                    "Are these two images visually similar? Reply YES or NO and give a short explanation suitable for a child.",
+                },
+                {
+                  inline_data: {
+                    mime_type: "image/png",
+                    data: drawingBase64,
+                  },
+                },
+                {
+                  inline_data: {
+                    mime_type: "image/png",
+                    data: fishBase64,
+                  },
+                },
+              ],
+            },
+          ],
+        };
+
+        // Make the Gemini API call
+        const response = await fetch(geminiApiUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
+
+        const result = await response.json();
+        console.log("Gemini API response:", JSON.stringify(result, null, 2));
+
+        setShowSuccessPopup(true);
+        Animated.spring(successScale, {
+          toValue: 1,
+          friction: 4,
+          useNativeDriver: true,
+        }).start();
+
+        setTimeout(() => {
+          setShowSuccessPopup(false);
+          onContinueStory();
+        }, 2000);
+      } catch (error) {
+        console.error("API call failed:", error);
+      }
+    } else {
+      console.warn("ViewShot ref or capture method is undefined");
+    }
   };
 
   const handleClear = () => {
@@ -115,39 +184,41 @@ const DrawingInterface = ({
           resizeMode="contain"
         />
       )}
-      <View
-        style={styles.outlineBox}
-        onStartShouldSetResponder={() => true}
-        onResponderGrant={handleDrawingStart}
-        onResponderMove={handleDrawingMove}
-      >
-        <Svg height="100%" width="100%" viewBox="0 0 300 300">
-          {interaction.outlineParts.map((part) => (
-            <Path
-              key={part.id}
-              d={part.svgPath}
-              stroke={selectedPartId === part.id ? "#333" : "#999"}
-              strokeWidth={selectedPartId === part.id ? 2.5 : 1.5}
-              strokeDasharray="6, 3"
-              fill={fillColors[part.id] || "rgba(255, 255, 255, 0.7)"}
-              onPress={() => handlePartPress(part.id)}
-            />
-          ))}
-          {Object.values(userPaths)
-            .flat()
-            .map((item, index) => (
+      <ViewShot ref={viewRef} options={{ format: "png", result: "base64" }}>
+        <View
+          style={styles.outlineBox}
+          onStartShouldSetResponder={() => true}
+          onResponderGrant={handleDrawingStart}
+          onResponderMove={handleDrawingMove}
+        >
+          <Svg height="100%" width="100%" viewBox="0 0 300 300">
+            {interaction.outlineParts.map((part) => (
               <Path
-                key={index}
-                d={item.path}
-                stroke={item.color}
-                strokeWidth={item.strokeWidth}
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+                key={part.id}
+                d={part.svgPath}
+                stroke={selectedPartId === part.id ? "#333" : "#999"}
+                strokeWidth={selectedPartId === part.id ? 2.5 : 1.5}
+                strokeDasharray="6, 3"
+                fill={fillColors[part.id] || "rgba(255, 255, 255, 0.7)"}
+                onPress={() => handlePartPress(part.id)}
               />
             ))}
-        </Svg>
-      </View>
+            {Object.values(userPaths)
+              .flat()
+              .map((item, index) => (
+                <Path
+                  key={index}
+                  d={item.path}
+                  stroke={item.color}
+                  strokeWidth={item.strokeWidth}
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              ))}
+          </Svg>
+        </View>
+      </ViewShot>
 
       <View style={styles.toolsSection}>
         <View style={styles.colorPalette}>
@@ -298,7 +369,9 @@ export default function JuniorPlaybackScreen() {
       </Pressable>
       {controlsVisible && appState === "video" && (
         <Pressable style={styles.controlsOverlay} onPress={togglePlayPause}>
-          <Text style={styles.controlButtonText}>{isPlaying ? "❚❚" : "▶"}</Text>
+          <Text style={styles.controlButtonText}>
+            {isPlaying ? "❚❚" : "▶"}
+          </Text>
         </Pressable>
       )}
       {appState === "drawing" && currentInteraction && (

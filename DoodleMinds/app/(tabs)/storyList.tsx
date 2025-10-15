@@ -1,9 +1,8 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
+import React, { useMemo, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { allStories } from '../../data';
-import { useAudioPlayer } from 'expo-audio';
-import audioSource from '../../assets/BackgroundMusic.mp3';
+import { Audio } from 'expo-av';
 
 export default function StoryList() {
   const router = useRouter();
@@ -13,12 +12,39 @@ export default function StoryList() {
     return allStories.filter(story => story.language === lang);
   }, [lang]);
 
+  // Play background music on mount
+  const bgSoundRef = useRef<Audio.Sound | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+    async function loadBgMusic() {
+      if (!bgSoundRef.current) {
+        const { sound } = await Audio.Sound.createAsync(
+          require('../../assets/BackgroundMusic.mp3'),
+          { shouldPlay: true, isLooping: true }
+        );
+        bgSoundRef.current = sound;
+        if (isActive) {
+          await sound.playAsync();
+        }
+      }
+    }
+    loadBgMusic();
+    return () => {
+      isActive = false;
+      if (bgSoundRef.current) {
+        bgSoundRef.current.unloadAsync();
+      }
+    };
+  }, []);
+
   const handleSelectStory = (storyId: string) => {
     router.push({
       pathname: '/(tabs)/juniorPlayback',
       params: { storyId: storyId },
     });
   };
+
   // Colorful gradient backgrounds for cards
   const cardColors = [
     ['#FF6B9D', '#FEC163'],
@@ -28,11 +54,12 @@ export default function StoryList() {
     ['#82C4F8', '#6FEDD6'],
     ['#FFB6B9', '#FEC8D8'],
   ];
+  const getCardColor = (index: number) => cardColors[index % cardColors.length];
 
-  const getCardColor = (index: number) => {
-    return cardColors[index % cardColors.length];
-  };
-  const headerTitle = lang === 'hi' ? 'एक कहानी चुनें' : 'Story Time!';
+  const headerTitle = lang === 'hi'
+    ? '[translate:एक कहानी चुनें]'
+    : 'Story Time!';
+
   return (
     <View style={styles.container}>
       <View style={styles.starContainer}>
@@ -79,7 +106,7 @@ export default function StoryList() {
           );
         }}
         ListEmptyComponent={
-            <Text style={styles.emptyText}>No stories found for this language.</Text>
+          <Text style={styles.emptyText}>No stories found for this language.</Text>
         }
       />
     </View>
