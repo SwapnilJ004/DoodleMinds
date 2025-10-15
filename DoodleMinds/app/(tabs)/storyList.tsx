@@ -38,7 +38,7 @@ export default function StoryList() {
   const getCardColor = (index: number) => cardColors[index % cardColors.length];
 
   const headerTitle = lang === 'hi'
-    ? '[translate:एक कहानी चुनें]'
+    ? 'एक कहानी चुनें'
     : 'Story Time!';
 
   return (

@@ -16,7 +16,7 @@ export default function Index() {
 
     async function playBackgroundMusic() {
       if (backgroundSoundRef.current) {
-        await backgroundSoundRef.current.setPositionAsync(10000); // Seek to 10s
+        await backgroundSoundRef.current.setPositionAsync(1000);
         await backgroundSoundRef.current.playAsync();
         return;
       }
@@ -69,7 +69,7 @@ export default function Index() {
   async function pauseBackgroundMusic() {
     await backgroundSoundRef.current?.pauseAsync();
   }
-  
+
   const handleAgeSelection = (ageGroup: 'young' | 'older') => {
     pauseBackgroundMusic()
     if (ageGroup === 'young') {
