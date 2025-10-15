@@ -30,9 +30,13 @@ const COLORS = [
 const DrawingInterface = ({
   interaction,
   onContinueStory,
+  storyId,
+  interactionIndex,
 }: {
   interaction: InteractionPoint;
   onContinueStory: () => void;
+  storyId: string;
+  interactionIndex: number;
 }) => {
   const viewRef = useRef<ViewShot>(null);
   const [userPaths, setUserPaths] = useState<{
@@ -44,10 +48,14 @@ const DrawingInterface = ({
     interaction.outlineParts.length > 0 ? interaction.outlineParts[0].id : null
   );
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [showTryAgainPopup, setShowTryAgainPopup] = useState(false);
   const [brushSize, setBrushSize] = useState<number>(4);
+  const [attemptCount, setAttemptCount] = useState(0);
 
   const currentPath = useRef<string>("");
   const successScale = useRef(new Animated.Value(0)).current;
+  const tryAgainScale = useRef(new Animated.Value(0)).current;
+  const [isChecking, setIsChecking] = useState(false);
 
   const handleDrawingStart = (event: any) => {
     if (!selectedPartId) return;
@@ -88,80 +96,119 @@ const DrawingInterface = ({
     setFillColors((prev) => ({ ...prev, [partId]: currentColor }));
   };
 
-  // Helper to get base64 of a static asset using expo-asset and expo-file-system
-  const getAssetBase64 = async (requireSource: string | number | { uri: string; width: number; height: number; }) => {
+  const getAssetBase64 = async (requireSource: any) => {
     const asset = Asset.fromModule(requireSource);
     await asset.downloadAsync();
-    // Use asset.localUri, or asset.uri if .localUri is undefined
     const uri = asset.localUri || asset.uri;
     return await FileSystem.readAsStringAsync(uri, { encoding: "base64" });
+  };
+
+  const getReferenceImages = async () => {
+    console.log('Selected Story:', storyId, 'Interaction:', interactionIndex);
+    switch (storyId) {
+      case "Clever-Fish":
+        return [await getAssetBase64(require("../../assets/fish.png"))];
+      case "the-bear-and-the-bee":
+        if (interactionIndex === 0)
+          return [await getAssetBase64(require("../../assets/beehive.png"))];
+        if (interactionIndex === 1)
+          return [await getAssetBase64(require("../../assets/honeypot.png"))];
+        break;
+      case "the-wind-and-the-sun":
+        if (interactionIndex === 0)
+          return [await getAssetBase64(require("../../assets/sun.png"))];
+        if (interactionIndex === 1)
+          return [await getAssetBase64(require("../../assets/omlet.png"))];
+        break;
+      case "tuta-ghada":
+        if (interactionIndex === 0)
+          return [await getAssetBase64(require("../../assets/pot.png"))];
+        if (interactionIndex === 1)
+          return [await getAssetBase64(require("../../assets/flower.png"))];
+        break;
+      default:
+        return [await getAssetBase64(require("../../assets/fish.png"))];
+    }
+    return [];
   };
 
   const handleSubmit = async () => {
     if (viewRef.current && typeof viewRef.current.capture === "function") {
       try {
-        // Capture drawing as base64 PNG
+        setIsChecking(true);
         const drawingBase64 = await viewRef.current.capture();
+        const referenceImages = (await getReferenceImages()) || [];
 
-        // Get fish.png from your project assets as base64
-        const fishBase64 = await getAssetBase64(require("../../assets/fish.png"));
-
-        // Gemini API endpoint (2.5-flash, using your API key)
         const geminiApiUrl =
           "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyAay25hKjum5zo60sNKOMR-jgEiTsytq8I";
+        const prompt =
+          "Are these two images visually similar? Reply YES if the child’s drawing matches the reference at least 20%, even if it’s not perfect or colored in roughly. If not, reply NO. Give a short, friendly explanation for kids.";
 
-        // Create payload for content generation
-        // For comparing two images, you can use the "contents" array with two "parts" of inline_data, and give the model a prompt as the first message part.
+        const parts = [
+          { text: prompt },
+          { inline_data: { mime_type: "image/png", data: drawingBase64 } },
+          ...referenceImages.map((ref) => ({
+            inline_data: { mime_type: "image/png", data: ref },
+          })),
+        ];
+
         const body = {
           contents: [
             {
               role: "user",
-              parts: [
-                {
-                  text:
-                    "Are these two images visually similar? Reply YES or NO and give a short explanation suitable for a child.",
-                },
-                {
-                  inline_data: {
-                    mime_type: "image/png",
-                    data: drawingBase64,
-                  },
-                },
-                {
-                  inline_data: {
-                    mime_type: "image/png",
-                    data: fishBase64,
-                  },
-                },
-              ],
+              parts,
             },
           ],
         };
 
-        // Make the Gemini API call
         const response = await fetch(geminiApiUrl, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
 
         const result = await response.json();
         console.log("Gemini API response:", JSON.stringify(result, null, 2));
+        const reply =
+          result?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
 
-        setShowSuccessPopup(true);
-        Animated.spring(successScale, {
-          toValue: 1,
-          friction: 4,
-          useNativeDriver: true,
-        }).start();
-
-        setTimeout(() => {
-          setShowSuccessPopup(false);
-          onContinueStory();
-        }, 2000);
+        if (/^YES/i.test(reply)) {
+          setShowSuccessPopup(true);
+          Animated.spring(successScale, {
+            toValue: 1,
+            friction: 4,
+            useNativeDriver: true,
+          }).start();
+          setTimeout(() => {
+            setShowSuccessPopup(false);
+            setAttemptCount(0);
+            onContinueStory();
+          }, 2000);
+        } else if (attemptCount < 2) {
+          setAttemptCount(attemptCount + 1);
+          setShowTryAgainPopup(true);
+          Animated.spring(tryAgainScale, {
+            toValue: 1,
+            friction: 4,
+            useNativeDriver: true,
+          }).start();
+          setTimeout(() => setShowTryAgainPopup(false), 1500);
+        } else {
+          setAttemptCount(0);
+          setShowSuccessPopup(true);
+          Animated.spring(successScale, {
+            toValue: 1,
+            friction: 4,
+            useNativeDriver: true,
+          }).start();
+          setTimeout(() => {
+            setShowSuccessPopup(false);
+            onContinueStory();
+          }, 2000);
+        }
+        setIsChecking(false);
       } catch (error) {
+        setIsChecking(false);
         console.error("API call failed:", error);
       }
     } else {
@@ -175,108 +222,125 @@ const DrawingInterface = ({
   };
 
   return (
-    <View style={styles.drawingContainer}>
-      <Text style={styles.title}>{interaction.prompt}</Text>
-      {interaction.image && (
-        <Image
-          source={interaction.image}
-          style={styles.referenceImage}
-          resizeMode="contain"
-        />
-      )}
-      <ViewShot ref={viewRef} options={{ format: "png", result: "base64" }}>
-        <View
-          style={styles.outlineBox}
-          onStartShouldSetResponder={() => true}
-          onResponderGrant={handleDrawingStart}
-          onResponderMove={handleDrawingMove}
-        >
-          <Svg height="100%" width="100%" viewBox="0 0 300 300">
-            {interaction.outlineParts.map((part) => (
-              <Path
-                key={part.id}
-                d={part.svgPath}
-                stroke={selectedPartId === part.id ? "#333" : "#999"}
-                strokeWidth={selectedPartId === part.id ? 2.5 : 1.5}
-                strokeDasharray="6, 3"
-                fill={fillColors[part.id] || "rgba(255, 255, 255, 0.7)"}
-                onPress={() => handlePartPress(part.id)}
-              />
-            ))}
-            {Object.values(userPaths)
-              .flat()
-              .map((item, index) => (
-                <Path
-                  key={index}
-                  d={item.path}
-                  stroke={item.color}
-                  strokeWidth={item.strokeWidth}
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              ))}
-          </Svg>
-        </View>
-      </ViewShot>
-
-      <View style={styles.toolsSection}>
-        <View style={styles.colorPalette}>
-          {COLORS.map(({ color }) => (
-            <TouchableOpacity
-              key={color}
-              style={[
-                styles.colorOption,
-                {
-                  backgroundColor: color,
-                  transform: [{ scale: currentColor === color ? 1.2 : 1 }],
-                },
-              ]}
-              onPress={() => setCurrentColor(color)}
+  <View style={styles.drawingContainer}>
+    <Text style={styles.title}>{interaction.prompt}</Text>
+    {interaction.image && (
+      <Image
+        source={interaction.image}
+        style={styles.referenceImage}
+        resizeMode="contain"
+      />
+    )}
+    <ViewShot ref={viewRef} options={{ format: "png", result: "base64" }}>
+      <View
+        style={styles.outlineBox}
+        onStartShouldSetResponder={() => true}
+        onResponderGrant={handleDrawingStart}
+        onResponderMove={handleDrawingMove}
+      >
+        <Svg height="100%" width="100%" viewBox="0 0 300 300">
+          {interaction.outlineParts.map((part) => (
+            <Path
+              key={part.id}
+              d={part.svgPath}
+              stroke={selectedPartId === part.id ? "#333" : "#999"}
+              strokeWidth={selectedPartId === part.id ? 2.5 : 1.5}
+              strokeDasharray="6, 3"
+              fill={fillColors[part.id] || "rgba(255, 255, 255, 0.7)"}
+              onPress={() => handlePartPress(part.id)}
             />
           ))}
-        </View>
-        <View style={styles.brushOptions}>
-          {[4, 8, 12].map((size) => (
-            <TouchableOpacity
-              key={size}
-              style={[
-                styles.brushOption,
-                brushSize === size && styles.brushOptionSelected,
-              ]}
-              onPress={() => setBrushSize(size)}
-            >
-              <View
-                style={[
-                  styles.brushPreview,
-                  { width: size * 2, height: size * 2 },
-                ]}
+          {Object.values(userPaths)
+            .flat()
+            .map((item, index) => (
+              <Path
+                key={index}
+                d={item.path}
+                stroke={item.color}
+                strokeWidth={item.strokeWidth}
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               />
-            </TouchableOpacity>
-          ))}
-        </View>
+            ))}
+        </Svg>
       </View>
+    </ViewShot>
 
-      <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
-          <Text style={styles.buttonText}>Clear</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.buttonText}>Done!</Text>
-        </TouchableOpacity>
+    {isChecking && (
+      <View style={styles.loaderOverlay}>
+        <Text style={styles.loaderText}>Checking...</Text>
       </View>
+    )}
 
-      <Modal visible={showSuccessPopup} transparent animationType="fade">
-        <View style={styles.popupContainer}>
-          <Animated.View
-            style={[styles.popup, { transform: [{ scale: successScale }] }]}
+    <View style={styles.toolsSection}>
+      <View style={styles.colorPalette}>
+        {COLORS.map(({ color }) => (
+          <TouchableOpacity
+            key={color}
+            style={[
+              styles.colorOption,
+              {
+                backgroundColor: color,
+                transform: [{ scale: currentColor === color ? 1.2 : 1 }],
+              },
+            ]}
+            onPress={() => setCurrentColor(color)}
+          />
+        ))}
+      </View>
+      <View style={styles.brushOptions}>
+        {[4, 8, 12].map((size) => (
+          <TouchableOpacity
+            key={size}
+            style={[
+              styles.brushOption,
+              brushSize === size && styles.brushOptionSelected,
+            ]}
+            onPress={() => setBrushSize(size)}
           >
-            <Text style={styles.popupText}>Amazing Work!</Text>
-          </Animated.View>
-        </View>
-      </Modal>
+            <View
+              style={[
+                styles.brushPreview,
+                { width: size * 2, height: size * 2 },
+              ]}
+            />
+          </TouchableOpacity>
+        ))}
+      </View>
     </View>
-  );
+
+    <View style={styles.buttonRow}>
+      <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
+        <Text style={styles.buttonText}>Clear</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+        <Text style={styles.buttonText}>Done!</Text>
+      </TouchableOpacity>
+    </View>
+
+    <Modal visible={showSuccessPopup} transparent animationType="fade">
+      <View style={styles.popupContainer}>
+        <Animated.View
+          style={[styles.popup, { transform: [{ scale: successScale }] }]}
+        >
+          <Text style={styles.popupText}>Amazing Work!</Text>
+        </Animated.View>
+      </View>
+    </Modal>
+
+    <Modal visible={showTryAgainPopup} transparent animationType="fade">
+      <View style={styles.popupContainer}>
+        <Animated.View
+          style={[styles.popup, { transform: [{ scale: tryAgainScale }] }]}
+        >
+          <Text style={[styles.popupText, { color: "#FF6B6B" }]}>Try Again!</Text>
+        </Animated.View>
+      </View>
+    </Modal>
+  </View>
+);
+
 };
 
 export default function JuniorPlaybackScreen() {
@@ -292,6 +356,12 @@ export default function JuniorPlaybackScreen() {
 
   const videoRef = useRef<Video>(null);
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // Find the index of current interaction in storyData.interactionPoints
+  const currentInteractionIndex =
+    storyData && currentInteraction
+      ? storyData.interactionPoints.findIndex((p) => p === currentInteraction)
+      : 0;
 
   useEffect(() => {
     if (!storyData) {
@@ -379,6 +449,8 @@ export default function JuniorPlaybackScreen() {
           <DrawingInterface
             interaction={currentInteraction}
             onContinueStory={handleContinueStory}
+            storyId={storyId}
+            interactionIndex={currentInteractionIndex}
           />
         </View>
       )}
@@ -497,4 +569,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   popupText: { fontSize: 24, fontWeight: "bold", color: "#333" },
+  loaderOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+  loaderText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 24,
+  },
 });
