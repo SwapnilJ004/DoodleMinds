@@ -3,6 +3,8 @@ import React, { useState, useRef, useEffect } from "react";
 import ViewShot from "react-native-view-shot";
 import * as FileSystem from "expo-file-system/legacy";
 import { Asset } from "expo-asset";
+import Slider from "@react-native-community/slider";
+
 import {
   StyleSheet,
   View,
@@ -57,6 +59,8 @@ const DrawingInterface = ({
   const successScale = useRef(new Animated.Value(0)).current;
   const tryAgainScale = useRef(new Animated.Value(0)).current;
   const [isChecking, setIsChecking] = useState(false);
+  
+
 
   const handleDrawingStart = (event: any) => {
     if (!selectedPartId) return;
@@ -355,6 +359,9 @@ export default function JuniorPlaybackScreen() {
     useState<InteractionPoint | null>(null);
   const [completedTimestamps, setCompletedTimestamps] = useState<number[]>([]);
 
+  const [videoProgress, setVideoProgress] = useState(0);   // A value between 0 and 1
+  const [videoDuration, setVideoDuration] = useState(0);   // In milliseconds
+  const [videoPosition, setVideoPosition] = useState(0);   // In milliseconds
   const videoRef = useRef<Video>(null);
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   
@@ -371,20 +378,27 @@ export default function JuniorPlaybackScreen() {
   }, [storyData]);
 
   const handlePlaybackStatusUpdate = (status: AVPlaybackStatus) => {
-    if (!status.isLoaded || !storyData) return;
-    const nextInteraction = storyData.interactionPoints.find(
-      (p: InteractionPoint) =>
-        status.positionMillis >= p.timestamp &&
-        !completedTimestamps.includes(p.timestamp)
-    );
-    if (nextInteraction) {
-      videoRef.current?.pauseAsync();
-      setIsPlaying(false);
-      setCurrentInteraction(nextInteraction);
-      setCompletedTimestamps((prev) => [...prev, nextInteraction.timestamp]);
-      setAppState("drawing");
-    }
-  };
+  if (!status.isLoaded || !storyData) return;
+
+  setVideoDuration(status.durationMillis || 0);
+  setVideoPosition(status.positionMillis || 0);
+  setVideoProgress(status.durationMillis ? (status.positionMillis || 0) / status.durationMillis : 0);
+
+  // (your existing code for triggering drawing interaction)
+  const nextInteraction = storyData.interactionPoints.find(
+    (p: InteractionPoint) =>
+      status.positionMillis >= p.timestamp &&
+      !completedTimestamps.includes(p.timestamp)
+  );
+  if (nextInteraction) {
+    videoRef.current?.pauseAsync();
+    setIsPlaying(false);
+    setCurrentInteraction(nextInteraction);
+    setCompletedTimestamps((prev) => [...prev, nextInteraction.timestamp]);
+    setAppState("drawing");
+  }
+};
+
 
   const handleContinueStory = () => {
     setAppState("video");
@@ -427,36 +441,67 @@ export default function JuniorPlaybackScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <Pressable style={styles.videoContainer} onPress={showControls}>
-        <Video
-          ref={videoRef}
-          style={styles.video}
-          source={storyData.video}
-          resizeMode={ResizeMode.CONTAIN}
-          shouldPlay={isPlaying}
-          onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
+  <View style={styles.container}>
+    <Pressable style={styles.videoContainer} onPress={showControls}>
+      <Video
+        ref={videoRef}
+        style={styles.video}
+        source={storyData.video}
+        resizeMode={ResizeMode.CONTAIN}
+        shouldPlay={isPlaying}
+        onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
+      />
+    </Pressable>
+    
+    {/* --- Video progress slider and time, only in video mode --- */}
+    {appState === "video" && (
+      <>
+        <Slider
+          style={{ width: "90%", alignSelf: "center", marginTop: -16, marginBottom: 12 }}
+          minimumValue={0}
+          maximumValue={1}
+          value={videoProgress}
+          minimumTrackTintColor="#4ECDC4"
+          maximumTrackTintColor="#eee"
+          thumbTintColor="#8B5CF6"
+          onSlidingComplete={async (value) => {
+            const seekTo = (videoDuration || 0) * value;
+            if (videoRef.current) {
+              await videoRef.current.setPositionAsync(seekTo);
+            }
+          }}
         />
-      </Pressable>
-      {controlsVisible && appState === "video" && (
-        <Pressable style={styles.controlsOverlay} onPress={togglePlayPause}>
-          <Text style={styles.controlButtonText}>
-            {isPlaying ? "❚❚" : "▶"}
+        <View style={{flexDirection:'row', justifyContent:'space-between', width:"90%",alignSelf:'center', marginBottom:16}}>
+          <Text style={{ color:"#333", fontSize:12 }}>
+            {Math.floor((videoPosition||0)/60000)}:{String(Math.floor(((videoPosition||0)%60000)/1000)).padStart(2,"0")}
           </Text>
-        </Pressable>
-      )}
-      {appState === "drawing" && currentInteraction && (
-        <View style={styles.drawingOverlay}>
-          <DrawingInterface
-            interaction={currentInteraction}
-            onContinueStory={handleContinueStory}
-            storyId={storyId}
-            interactionIndex={currentInteractionIndex}
-          />
+          <Text style={{ color:"#333", fontSize:12 }}>
+            {Math.floor((videoDuration||0)/60000)}:{String(Math.floor(((videoDuration||0)%60000)/1000)).padStart(2,"0")}
+          </Text>
         </View>
-      )}
-    </View>
-  );
+      </>
+    )}
+
+    {controlsVisible && appState === "video" && (
+      <Pressable style={styles.controlsOverlay} onPress={togglePlayPause}>
+        <Text style={styles.controlButtonText}>
+          {isPlaying ? "❚❚" : "▶"}
+        </Text>
+      </Pressable>
+    )}
+    {appState === "drawing" && currentInteraction && (
+      <View style={styles.drawingOverlay}>
+        <DrawingInterface
+          interaction={currentInteraction}
+          onContinueStory={handleContinueStory}
+          storyId={storyId}
+          interactionIndex={currentInteractionIndex}
+        />
+      </View>
+    )}
+  </View>
+);
+
 }
 
 const styles = StyleSheet.create({
