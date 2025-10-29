@@ -107,28 +107,40 @@ export default function ScribbleGame() {
   }, []);
 
   useEffect(() => {
-    if (!roomId) return;
-    const roomRef = ref(database, `rooms/${roomId}`);
-    const unsubscribe = onValue(roomRef, (snapshot: { val: () => any }) => {
-      const data = snapshot.val();
-      if (data) {
-        setGameState(data.gameState || "lobby");
-        setPlayers(data.players || {});
-        setCurrentDrawer(data.currentDrawer || null);
-        setCurrentWord(data.currentWord || "");
-        setTimeLeft(data.timeLeft !== undefined ? data.timeLeft : 60);
-        setRound(data.round || 1);
-        setChatMessages(
-          data.chatMessages ? Object.values(data.chatMessages) : []
-        );
-        setPaths(data.paths ? Object.values(data.paths) : []);
-      } else {
-        alert("Room not found or has been closed.");
-        setRoomId(null);
+  if (!roomId) return;
+  const roomRef = ref(database, `rooms/${roomId}`);
+
+  const unsubscribe = onValue(roomRef, (snapshot: { val: () => any }) => {
+    const data = snapshot.val();
+    if (data) {
+      setGameState(data.gameState || "lobby");
+      setPlayers(data.players || {});
+      setCurrentDrawer(data.currentDrawer || null);
+      setCurrentWord(data.currentWord || "");
+      setTimeLeft(data.timeLeft !== undefined ? data.timeLeft : 60);
+      setRound(data.round || 1);
+      setChatMessages(
+        data.chatMessages ? Object.values(data.chatMessages) : []
+      );
+      setPaths(data.paths ? Object.values(data.paths) : []);
+
+      // Fix: If game just started and you are supposed to be the first drawer, launch modal
+      if (
+        data.gameState === "guessing" &&
+        data.currentDrawer === currentPlayerId &&
+        !data.currentWord // only if word isn't selected yet!
+      ) {
+        setWordChoices(getRandomWords(3));
+        setShowWordModal(true);
       }
-    });
-    return () => off(roomRef, "value", unsubscribe);
-  }, [roomId]);
+    } else {
+      alert("Room not found or has been closed.");
+      setRoomId(null);
+    }
+  });
+  return () => off(roomRef, "value", unsubscribe);
+}, [roomId]);
+
 
   useEffect(() => {
     if ((gameState === "drawing" || gameState === "guessing") && timeLeft > 0) {
@@ -151,6 +163,29 @@ export default function ScribbleGame() {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [gameState, timeLeft, players, currentPlayerId, roomId]);
+useEffect(() => {
+  if (gameState === "reveal") {
+    const playersArray = Object.values(players);
+    const isLastRound = round >= playersArray.length;
+
+    const timeoutId = setTimeout(() => {
+      if (roomId) {
+        if (isLastRound) {
+          update(ref(database, `rooms/${roomId}`), { gameState: "gameover" });
+        } else {
+          const nextRound = round + 1;
+          setRound(nextRound);  // update local state first
+          update(ref(database, `rooms/${roomId}`), { round: nextRound });
+          setTimeout(() => startNewRound(nextRound), 500);
+        }
+      }
+    }, 5000);
+
+    return () => clearTimeout(timeoutId);
+  }
+}, [gameState, round, roomId, players]);
+
+
 
   const handleCreateGame = async () => {
     if (!currentPlayerName.trim()) return alert("Please enter your name!");
@@ -207,38 +242,64 @@ export default function ScribbleGame() {
 };
 
   const handleStartGame = () => {
-    if (!roomId) return;
-    if (Object.values(players).length < 2)
-      return alert("Need at least 2 players to start!");
-    startNewRound();
-  };
+  if (!roomId) return;
+  if (Object.values(players).length < 2)
+    return alert("Need at least 2 players to start!");
 
-  const startNewRound = () => {
-    if (!roomId) return;
-    const playersArray = Object.values(players);
-    const drawerIndex = (round - 1) % playersArray.length;
-    const newDrawer = playersArray[drawerIndex].id;
+  const initialRound = 1;
+  setRound(initialRound);
+  startNewRound(initialRound);
+};
 
-    const updatedPlayers: Record<string, Player> = {};
-    playersArray.forEach((p) => {
-      updatedPlayers[p.id] = { ...p, hasGuessed: false };
-    });
 
-    if (newDrawer === currentPlayerId) {
-      setWordChoices(getRandomWords(3));
-      setShowWordModal(true);
-    }
+  const startNewRound = async (roundNumber: number) => {
+  if (!roomId) return;
+  const roomRef = ref(database, `rooms/${roomId}`);
 
-    update(ref(database, `rooms/${roomId}`), {
-      currentDrawer: newDrawer,
-      gameState: "guessing",
-      timeLeft: 60,
-      paths: null,
-      chatMessages: null,
-      players: updatedPlayers,
-      currentWord: "",
-    });
-  };
+  const snapshot = await get(roomRef);
+  const data = snapshot.val();
+  if (!data) return;
+
+  const playersData = (data.players || {}) as Record<string, Player>;
+  const playersArray: Player[] = Object.values(playersData);
+
+
+  // Count how many guessed correctly this round
+  const correctGuessCount = playersArray.filter(p => p.hasGuessed).length;
+
+  // Determine new drawer based on passed roundNumber, not local state
+  const drawerIndex = (roundNumber - 1) % playersArray.length;
+  const newDrawerId = playersArray[drawerIndex]?.id;
+
+  const drawerScoreBonus = correctGuessCount * 50;
+
+  if (newDrawerId && playersData[newDrawerId]) {
+    playersData[newDrawerId].score = (playersData[newDrawerId].score || 0) + drawerScoreBonus;
+  }
+
+  Object.keys(playersData).forEach(id => {
+    playersData[id].hasGuessed = false;
+  });
+
+  await update(roomRef, {
+    players: playersData,
+    currentDrawer: newDrawerId,
+    gameState: "guessing",
+    timeLeft: 60,
+    paths: null,
+    chatMessages: null,
+    currentWord: "",
+    round: roundNumber,
+  });
+
+  if (newDrawerId === currentPlayerId) {
+    setWordChoices(getRandomWords(3));
+    setShowWordModal(true);
+  } else {
+    setShowWordModal(false);
+  }
+};
+
 
   const getRandomWords = (count: number): string[] => {
     const shuffled = [...WORD_LIST].sort(() => 0.5 - Math.random());
