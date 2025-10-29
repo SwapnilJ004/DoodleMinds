@@ -1,45 +1,24 @@
 // app/(tabs)/index.tsx
 import { Text, View, StyleSheet, TouchableOpacity } from "react-native";
 import { useEffect, useState, useRef } from "react";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import * as Animatable from "react-native-animatable";
 import { Audio } from "expo-av";
+import { useMusic } from '../useMusic.js'
 
 export default function Index() {
   const router = useRouter();
   const [showAgeSelection, setShowAgeSelection] = useState(false);
-  const backgroundSoundRef = useRef<Audio.Sound | null>(null);
+  const { loadAndPlay } = useMusic();
 
-  // Play background music when screen is focused
-  useFocusEffect(() => {
-    let isActive = true;
-
-    async function playBackgroundMusic() {
-      if (backgroundSoundRef.current) {
-        await backgroundSoundRef.current.setPositionAsync(1000);
-        await backgroundSoundRef.current.playAsync();
-        return;
-      }
-      const { sound } = await Audio.Sound.createAsync(
-        require("../../assets/BackgroundMusic.mp3"),
-        { shouldPlay: true, positionMillis: 10000, isLooping: true }
-      );
-      backgroundSoundRef.current = sound;
-      if (isActive) {
-        await sound.playAsync();
-      }
-    }
-
+  useEffect(() => {
     setTimeout(() => {
-      playBackgroundMusic();
-    }, 1500)
+      loadAndPlay();
+    }, 2900)
+  }, [])
 
-    return () => {
-      isActive = false;
-      // Optional: background music keeps playing in memory, or unload if navigating away
-    };
-  });
 
+  // Logo Sound Effect:
   useEffect(() => {
     let sound: Audio.Sound | null = null;
 
@@ -59,30 +38,27 @@ export default function Index() {
 
     return () => {
       if (sound) {
-        sound.unloadAsync();
+        // sound.unloadAsync();
       }
       clearTimeout(timeout);
     };
   }, []);
 
-
-  async function pauseBackgroundMusic() {
-    await backgroundSoundRef.current?.pauseAsync();
-  }
-
   const handleAgeSelection = (ageGroup: 'young' | 'older') => {
-    pauseBackgroundMusic()
     if (ageGroup === 'young') {
       router.push({
-        pathname: "/(tabs)/juniorPage",
+        pathname: "/(tabs)/juniorPage"
       });
     } else {
-      router.push("/(tabs)/scribblePage" as never);
+      router.push({
+        pathname: "/(tabs)/scribblePage"
+      });
     }
   };
 
   if (!showAgeSelection) {
     // Logo splash screen
+
     return (
       <View style={styles.container}>
         <Animatable.Text

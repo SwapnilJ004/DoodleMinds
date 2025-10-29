@@ -23,6 +23,7 @@ import {
 import * as Animatable from "react-native-animatable";
 import Svg, { Path } from "react-native-svg";
 import { database } from "../../firebaseConfig";
+import { useMusic } from "../useMusic";
 
 // --- Constants ---
 const WORD_LIST = [
@@ -97,6 +98,7 @@ export default function ScribbleGame() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // --- Hooks and Functions ---
+  const { resumeMusic, pauseMusic, player } = useMusic();
 
   useEffect(() => {
     const loadPlayerName = async () => {
@@ -165,51 +167,52 @@ export default function ScribbleGame() {
   };
 
   const handleJoinExistingGame = async () => {
-  if (!currentPlayerName.trim()) return alert("Please enter your name!");
-  if (!joinRoomId.trim()) return alert("Please enter a room code!");
-  
-  // Check if room exists before joining
-  const roomRef = ref(database, `rooms/${joinRoomId.toUpperCase()}`);
-  const snapshot = await get(roomRef);
-  
-  if (!snapshot.exists()) {
-    return alert("Invalid room code! Room does not exist.");
-  }
-  
-  // Check if game has already started
-  const roomData = snapshot.val();
-  if (roomData.gameState !== "lobby") {
-    return alert("This game has already started!");
-  }
-  
-  await AsyncStorage.setItem("playerName", currentPlayerName.trim());
-  joinGame(joinRoomId.toUpperCase());
-};
+    if (!currentPlayerName.trim()) return alert("Please enter your name!");
+    if (!joinRoomId.trim()) return alert("Please enter a room code!");
+
+    // Check if room exists before joining
+    const roomRef = ref(database, `rooms/${joinRoomId.toUpperCase()}`);
+    const snapshot = await get(roomRef);
+
+    if (!snapshot.exists()) {
+      return alert("Invalid room code! Room does not exist.");
+    }
+
+    // Check if game has already started
+    const roomData = snapshot.val();
+    if (roomData.gameState !== "lobby") {
+      return alert("This game has already started!");
+    }
+
+    await AsyncStorage.setItem("playerName", currentPlayerName.trim());
+    joinGame(joinRoomId.toUpperCase());
+  };
 
   const joinGame = (targetRoomId: string) => {
-  setRoomId(targetRoomId);
-  const playerRef = ref(
-    database,
-    `rooms/${targetRoomId}/players/${currentPlayerId}`
-  );
-  
-  // Use update on the room to ensure we're not overwriting
-  update(ref(database, `rooms/${targetRoomId}/players`), {
-    [currentPlayerId]: {
-      id: currentPlayerId,
-      name: currentPlayerName.trim(),
-      score: 0,
-      hasGuessed: false,
-    }
-  });
-  
-  onDisconnect(playerRef).remove();
-};
+    setRoomId(targetRoomId);
+    const playerRef = ref(
+      database,
+      `rooms/${targetRoomId}/players/${currentPlayerId}`
+    );
 
-  const handleStartGame = () => {
+    // Use update on the room to ensure we're not overwriting
+    update(ref(database, `rooms/${targetRoomId}/players`), {
+      [currentPlayerId]: {
+        id: currentPlayerId,
+        name: currentPlayerName.trim(),
+        score: 0,
+        hasGuessed: false,
+      }
+    });
+
+    onDisconnect(playerRef).remove();
+  };
+
+  const handleStartGame = async () => {
     if (!roomId) return;
     if (Object.values(players).length < 2)
       return alert("Need at least 2 players to start!");
+    await pauseMusic();
     startNewRound();
   };
 

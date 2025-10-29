@@ -1,8 +1,10 @@
 import React, { useMemo, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { allStories } from '../../data';
 import { Audio } from 'expo-av';
+import { useMusic } from '../useMusic';
+import { useMusicStore } from '../useMusicStore';
 
 export default function StoryList() {
   const router = useRouter();
@@ -11,15 +13,17 @@ export default function StoryList() {
     if (!lang) return [];
     return allStories.filter(story => story.language === lang);
   }, [lang]);
-  const backgroundSoundRef = useRef<Audio.Sound | null>(null);
+  const { resumeMusic, pauseMusic, player } = useMusic();
+  const { isPlaying } = useMusicStore();
 
-  const handleSelectStory = (storyId: string) => {
+  useEffect(() => {
+    console.log("Focussed", isPlaying);
+    if (isPlaying) resumeMusic();
+  }, [isPlaying])
+
+  const handleSelectStory = async (storyId: string) => {
     // Pause background music
-    async function pauseBackgroundMusic() {
-    }
-
-    pauseBackgroundMusic();
-
+    await pauseMusic();
     router.push({
       pathname: '/(tabs)/juniorPlayback',
       params: { storyId: storyId },
@@ -222,9 +226,10 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
   },
-  emptyText: { 
+  emptyText: {
     textAlign: 'center',
-    marginTop: 50, 
-    color: '#6B7280', 
-    fontSize: 16 },
+    marginTop: 50,
+    color: '#6B7280',
+    fontSize: 16
+  },
 });

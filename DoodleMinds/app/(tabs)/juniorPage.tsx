@@ -1,16 +1,13 @@
 import { Audio } from 'expo-av';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useRef } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Animatable from 'react-native-animatable';
-import { useAudioPlayer } from 'expo-audio';
-import audioSource from '../../assets/BackgroundMusic.mp3';
+import { useMusic } from '../useMusic.js';
 
 export default function LandingPage() {
   const router = useRouter();
-
-  // useFocusEffect(
-  // );
+  const { pauseMusic } = useMusic();
 
   return (
     <View style={styles.container}>
@@ -50,7 +47,7 @@ export default function LandingPage() {
 
             <TouchableOpacity
                 style={[styles.languageButton, styles.hindiButton]}
-                onPress={() => router.push({ pathname: '/(tabs)/storyList', params: { lang: 'hi' } })}
+                onPress={() => router.push({ pathname: '/(tabs)/storyList', params: { lang: 'hi'} })}
                 activeOpacity={0.8}
             >
                 <Text style={styles.languageButtonText}>हिन्दी कहानियाँ</Text>

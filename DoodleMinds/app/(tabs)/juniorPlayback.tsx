@@ -6,7 +6,7 @@ import { Asset } from "expo-asset";
 import {
   StyleSheet,
   View,
-  Text, 
+  Text,
   Pressable,
   Modal,
   TouchableOpacity,
@@ -25,7 +25,7 @@ const COLORS = [
   { name: "yellow", color: "#FFE66D" },
   { name: "orange", color: "#FF8B4D" },
   { name: "purple", color: "#C792EA" },
-  { name: "black", color: "#000000" }, 
+  { name: "black", color: "#000000" },
 ];
 
 const DrawingInterface = ({
@@ -223,124 +223,124 @@ const DrawingInterface = ({
   };
 
   return (
-  <View style={styles.drawingContainer}>
-    <Text style={styles.title}>{interaction.prompt}</Text>
-    {interaction.image && (
-      <Image
-        source={interaction.image}
-        style={styles.referenceImage}
-        resizeMode="contain"
-      />
-    )}
-    <ViewShot ref={viewRef} options={{ format: "png", result: "base64" }}>
-      <View
-        style={styles.outlineBox}
-        onStartShouldSetResponder={() => true}
-        onResponderGrant={handleDrawingStart}
-        onResponderMove={handleDrawingMove}
-      >
-        <Svg height="100%" width="100%" viewBox="0 0 300 300">
-          {interaction.outlineParts.map((part) => (
-            <Path
-              key={part.id}
-              d={part.svgPath}
-              stroke={selectedPartId === part.id ? "#333" : "#999"}
-              strokeWidth={selectedPartId === part.id ? 2.5 : 1.5}
-              strokeDasharray="6, 3"
-              fill={fillColors[part.id] || "rgba(255, 255, 255, 0.7)"}
-              onPress={() => handlePartPress(part.id)}
-            />
-          ))}
-          {Object.values(userPaths)
-            .flat()
-            .map((item, index) => (
+    <View style={styles.drawingContainer}>
+      <Text style={styles.title}>{interaction.prompt}</Text>
+      {interaction.image && (
+        <Image
+          source={interaction.image}
+          style={styles.referenceImage}
+          resizeMode="contain"
+        />
+      )}
+      <ViewShot ref={viewRef} options={{ format: "png", result: "base64" }}>
+        <View
+          style={styles.outlineBox}
+          onStartShouldSetResponder={() => true}
+          onResponderGrant={handleDrawingStart}
+          onResponderMove={handleDrawingMove}
+        >
+          <Svg height="100%" width="100%" viewBox="0 0 300 300">
+            {interaction.outlineParts.map((part) => (
               <Path
-                key={index}
-                d={item.path}
-                stroke={item.color}
-                strokeWidth={item.strokeWidth}
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+                key={part.id}
+                d={part.svgPath}
+                stroke={selectedPartId === part.id ? "#333" : "#999"}
+                strokeWidth={selectedPartId === part.id ? 2.5 : 1.5}
+                strokeDasharray="6, 3"
+                fill={fillColors[part.id] || "rgba(255, 255, 255, 0.7)"}
+                onPress={() => handlePartPress(part.id)}
               />
             ))}
-        </Svg>
-      </View>
-    </ViewShot>
+            {Object.values(userPaths)
+              .flat()
+              .map((item, index) => (
+                <Path
+                  key={index}
+                  d={item.path}
+                  stroke={item.color}
+                  strokeWidth={item.strokeWidth}
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              ))}
+          </Svg>
+        </View>
+      </ViewShot>
 
-    {isChecking && (
-      <View style={styles.loaderOverlay}>
-        <Text style={styles.loaderText}>Checking...</Text>
-      </View>
-    )}
+      {isChecking && (
+        <View style={styles.loaderOverlay}>
+          <Text style={styles.loaderText}>Checking...</Text>
+        </View>
+      )}
 
-    <View style={styles.toolsSection}>
-      <View style={styles.colorPalette}>
-        {COLORS.map(({ color }) => (
-          <TouchableOpacity
-            key={color}
-            style={[
-              styles.colorOption,
-              {
-                backgroundColor: color,
-                transform: [{ scale: currentColor === color ? 1.2 : 1 }],
-              },
-            ]}
-            onPress={() => setCurrentColor(color)}
-          />
-        ))}
-      </View>
-      <View style={styles.brushOptions}>
-        {[4, 8, 12].map((size) => (
-          <TouchableOpacity
-            key={size}
-            style={[
-              styles.brushOption,
-              brushSize === size && styles.brushOptionSelected,
-            ]}
-            onPress={() => setBrushSize(size)}
-          >
-            <View
+      <View style={styles.toolsSection}>
+        <View style={styles.colorPalette}>
+          {COLORS.map(({ color }) => (
+            <TouchableOpacity
+              key={color}
               style={[
-                styles.brushPreview,
-                { width: size * 2, height: size * 2 },
+                styles.colorOption,
+                {
+                  backgroundColor: color,
+                  transform: [{ scale: currentColor === color ? 1.2 : 1 }],
+                },
               ]}
+              onPress={() => setCurrentColor(color)}
             />
-          </TouchableOpacity>
-        ))}
+          ))}
+        </View>
+        <View style={styles.brushOptions}>
+          {[4, 8, 12].map((size) => (
+            <TouchableOpacity
+              key={size}
+              style={[
+                styles.brushOption,
+                brushSize === size && styles.brushOptionSelected,
+              ]}
+              onPress={() => setBrushSize(size)}
+            >
+              <View
+                style={[
+                  styles.brushPreview,
+                  { width: size * 2, height: size * 2 },
+                ]}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
+
+      <View style={styles.buttonRow}>
+        <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
+          <Text style={styles.buttonText}>Clear</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+          <Text style={styles.buttonText}>Done!</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Modal visible={showSuccessPopup} transparent animationType="fade">
+        <View style={styles.popupContainer}>
+          <Animated.View
+            style={[styles.popup, { transform: [{ scale: successScale }] }]}
+          >
+            <Text style={styles.popupText}>Amazing Work!</Text>
+          </Animated.View>
+        </View>
+      </Modal>
+
+      <Modal visible={showTryAgainPopup} transparent animationType="fade">
+        <View style={styles.popupContainer}>
+          <Animated.View
+            style={[styles.popup, { transform: [{ scale: tryAgainScale }] }]}
+          >
+            <Text style={[styles.popupText, { color: "#FF6B6B" }]}>Try Again!</Text>
+          </Animated.View>
+        </View>
+      </Modal>
     </View>
-
-    <View style={styles.buttonRow}>
-      <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
-        <Text style={styles.buttonText}>Clear</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-        <Text style={styles.buttonText}>Done!</Text>
-      </TouchableOpacity>
-    </View>
-
-    <Modal visible={showSuccessPopup} transparent animationType="fade">
-      <View style={styles.popupContainer}>
-        <Animated.View
-          style={[styles.popup, { transform: [{ scale: successScale }] }]}
-        >
-          <Text style={styles.popupText}>Amazing Work!</Text>
-        </Animated.View>
-      </View>
-    </Modal>
-
-    <Modal visible={showTryAgainPopup} transparent animationType="fade">
-      <View style={styles.popupContainer}>
-        <Animated.View
-          style={[styles.popup, { transform: [{ scale: tryAgainScale }] }]}
-        >
-          <Text style={[styles.popupText, { color: "#FF6B6B" }]}>Try Again!</Text>
-        </Animated.View>
-      </View>
-    </Modal>
-  </View>
-);
+  );
 
 };
 
@@ -357,7 +357,7 @@ export default function JuniorPlaybackScreen() {
 
   const videoRef = useRef<Video>(null);
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
+
   // Find the index of current interaction in storyData.interactionPoints
   const currentInteractionIndex =
     storyData && currentInteraction
